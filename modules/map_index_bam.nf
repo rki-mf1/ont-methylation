@@ -10,7 +10,8 @@ process bam2fastq {
     script:
     """
     mkdir -p ${sample_id}
-    samtools fastq ${bam_file} -T MM,ML > ${sample_id}/${sample_id}.fastq
+    gunzip ${bam_file} > unzipped.bam
+    samtools fastq unzipped.bam -T MM,ML > ${sample_id}/${sample_id}.fastq
     """
 }
 
