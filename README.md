@@ -101,6 +101,8 @@ To run the pipeline with a single reference and BAM file, use the following comm
 ```bash
 nextflow run valegale/ONT_methylation -r 0.0.1 --fasta sample_test.fasta --bam sample_test.bam
 ```
+**Warning:** The names of the FASTA and BAM files must match (excluding the file extension).
+
    
 - **fasta** specifies the reference genome file in FASTA format.
 - **bam** specifies the basecalled BAM file output from Dorado (see above).
@@ -113,7 +115,7 @@ nextflow run valegale/ONT_methylation -r 0.0.1 --fasta '*.fasta' --bam '*.bam'
 
 **Don't forget the single ticks `'...'`!**
 
-In this case, ensure that the base names of the FASTA and BAM files match exactly. This matching allows the pipeline to correctly associate each reference with its corresponding BAM file.
+Also in this case, ensure that the base names of the FASTA and BAM files match exactly. This matching allows the pipeline to correctly associate each reference with its corresponding BAM file.
 
 For complex cases with numerous references and BAM files, you can also use the `--list` parameter to specify CSV files as input instead of the direct paths to the files. This approach offers flexibility by allowing each reference and BAM file pair to be listed explicitly.
 
