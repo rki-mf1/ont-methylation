@@ -85,7 +85,7 @@ nextflow pull valegale/ONT_methylation
 # check available release versions and branches:
 nextflow info valegale/ONT_methylation
 # show the help message for a certain pipeline release version:
-# ATTENTION: check for the latest version or exact version you want to use! 
+# ATTENTION: check for the latest release version or exact version you want to use! 
 nextflow run valegale/ONT_methylation -r 0.0.1 --help
 # update the pipeline simply via pulling the code again:
 nextflow pull valegale/ONT_methylation
@@ -100,6 +100,7 @@ You can also `git clone` this repository and run the pipeline via `nextflow run 
 To run the pipeline with a single reference and BAM file, use the following command (**adjust the `-r` version as necessary**):
 
 ```bash
+# ATTENTION: check for the latest release version or exact version you want to use! 
 nextflow run valegale/ONT_methylation -r 0.0.1 --fasta sample_test.fasta --bam sample_test.bam
 ```
 **Warning:** The names of the FASTA and BAM files must match (excluding the file extension).
@@ -111,6 +112,7 @@ nextflow run valegale/ONT_methylation -r 0.0.1 --fasta sample_test.fasta --bam s
 If you have multiple references and BAM files, you can provide them using wildcard patterns (`*`). For example:
 
 ```bash
+# ATTENTION: check for the latest release version or exact version you want to use! 
 nextflow run valegale/ONT_methylation -r 0.0.1 --fasta '*.fasta' --bam '*.bam'
 ```
 
@@ -123,6 +125,7 @@ For complex cases with numerous references and BAM files, you can also use the `
 For example:
 
 ```bash
+# ATTENTION: check for the latest release version or exact version you want to use! 
 nextflow run valegale/ONT_methylation -r 0.0.1 --list --fasta references.csv --bam mappings.csv
 ```
 
@@ -148,6 +151,7 @@ sample3,/path/to/another/mapping3.bam
 To run the pipeline using Docker, use the following command:
 
 ```bash
+# ATTENTION: check for the latest release version or exact version you want to use! 
 nextflow run valegale/ONT_methylation -r 0.0.1 --fasta sample_test.fasta --bam sample_test.bam -profile docker
 ```
 
