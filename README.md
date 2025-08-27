@@ -77,7 +77,7 @@ The `dx` tag in the BAM record allows you to distinguish between simplex and dup
 However, it is not yet clear if duplex basecalling offers significant benefits for downstream analysis, as modification calls are still made on only one DNA strand.
 
 #### Basecalling with LARRI
-Alternatively, LARRI, another pipeline we developed, supports basecalling and assembly directly from pod5 files. It is possible to run the pipeline to simply basecall the pod5, also calling for methylation:
+Alternatively, [**LARRI**](https://github.com/rki-mf1/LARRI), another pipeline we developed, supports basecalling and assembly directly from pod5 files. It is possible to run the pipeline to simply basecall the pod5, also calling for methylation:
 
 ```bash
 nextflow run rki-mf1/LARRI -r 0.0.1 --pod5 'file.pod5' --basecalling --modifications
