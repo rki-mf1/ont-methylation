@@ -81,14 +81,14 @@ However, it is not yet clear if duplex basecalling offers significant benefits f
 To install the pipeline, simply use Nextflow:
 
 ```bash
-nextflow pull rki-mf1/ONT_methylation
+nextflow pull rki-mf1/ont-methylation
 # check available release versions and branches:
-nextflow info rki-mf1/ONT_methylation
+nextflow info rki-mf1/ont-methylation
 # show the help message for a certain pipeline release version:
 # ATTENTION: check for the latest release version or exact version you want to use! 
-nextflow run rki-mf1/ONT_methylation -r 0.0.1 --help
+nextflow run rki-mf1/ont-methylation -r 0.0.1 --help
 # update the pipeline simply via pulling the code again:
-nextflow pull rki-mf1/ONT_methylation
+nextflow pull rki-mf1/ont-methylation
 ```
 
 **Check to use the latest pipeline release version**. To have reproducible results, use the same version. 
@@ -101,7 +101,7 @@ To run the pipeline with a single reference and BAM file, use the following comm
 
 ```bash
 # ATTENTION: check for the latest release version or exact version you want to use! 
-nextflow run rki-mf1/ONT_methylation -r 0.0.1 --fasta sample_test.fasta --bam sample_test.bam
+nextflow run rki-mf1/ont-methylation -r 0.0.1 --fasta sample_test.fasta --bam sample_test.bam
 ```
 **Warning:** The names of the FASTA and BAM files must match (excluding the file extension).
 
@@ -113,7 +113,7 @@ If you have multiple references and BAM files, you can provide them using wildca
 
 ```bash
 # ATTENTION: check for the latest release version or exact version you want to use! 
-nextflow run rki-mf1/ONT_methylation -r 0.0.1 --fasta '*.fasta' --bam '*.bam'
+nextflow run rki-mf1/ont-methylation -r 0.0.1 --fasta '*.fasta' --bam '*.bam'
 ```
 
 **Don't forget the single ticks `'...'`!**
@@ -126,7 +126,7 @@ For example:
 
 ```bash
 # ATTENTION: check for the latest release version or exact version you want to use! 
-nextflow run rki-mf1/ONT_methylation -r 0.0.1 --list --fasta references.csv --bam mappings.csv
+nextflow run rki-mf1/ont-methylation -r 0.0.1 --list --fasta references.csv --bam mappings.csv
 ```
 
 The `references.csv` file should contain the sample name and path to each reference FASTA file:
@@ -152,18 +152,18 @@ To run the pipeline using Docker, use the following command:
 
 ```bash
 # ATTENTION: check for the latest release version or exact version you want to use! 
-nextflow run rki-mf1/ONT_methylation -r 0.0.1 --fasta sample_test.fasta --bam sample_test.bam -profile docker
+nextflow run rki-mf1/ont-methylation -r 0.0.1 --fasta sample_test.fasta --bam sample_test.bam -profile docker
 ```
 
 
 To run the pipeline with SLURM and conda, use this command:
 ```bash
-nextflow run nextflow pull rki-mf1/ONT_methylation --fasta sample_test.fasta --bam sample_test.bam -profile slurm,conda
+nextflow run nextflow pull rki-mf1/ont-methylation --fasta sample_test.fasta --bam sample_test.bam -profile slurm,conda
 ```
 
 To run the pipeline with SLURM and Singularity, use this command:
 ```bash
-nextflow run nextflow pull rki-mf1/ONT_methylation --fasta sample_test.fasta --bam sample_test.bam -profile slurm,singularity
+nextflow run nextflow pull rki-mf1/ont-methylation --fasta sample_test.fasta --bam sample_test.bam -profile slurm,singularity
 ```
    
 ## Results interpretation
