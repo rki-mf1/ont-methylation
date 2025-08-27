@@ -6,3 +6,4 @@ timeline*.html
 singularity/
 report*
 conda/
+nohup.out

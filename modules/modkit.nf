@@ -10,8 +10,9 @@ process modkit_pileup {
     tuple val(sample_id), path("${sample_id}/modkit_pileup_output.bed"), path(reference)
 
     script:
+    filter_threshold = params.automatic_threshold_modkit ? '' : "--filter-threshold ${params.filter_threshold_modkit}"
     """
-    modkit pileup -t ${task.cpus} ${mapped_bam} ${sample_id}/modkit_pileup_output.bed --filter-threshold ${params.filter_threshold_modkit} 
+    modkit pileup -t ${task.cpus} ${mapped_bam} ${sample_id}/modkit_pileup_output.bed ${filter_threshold}
     """
 }
 

@@ -120,8 +120,11 @@ def helpMSG() {
     ${c_yellow}Input${c_reset}
     ${c_green} --fasta ${c_reset}           '*.fasta'       -> one genome/assembly per file
     ${c_green} --bam ${c_reset}             '*.bam'         -> one sorted BAM matching one reference FASTA
- 
-    ${c_dim}  ..change above input to csv:${c_reset} ${c_green}--list ${c_reset}
+
+    ${c_dim}  change above input to csv:${c_reset} ${c_green}--list ${c_reset}
+
+    ${c_yellow}IMPORTANT:${c_reset} Unless ${c_green}--list${c_reset} is used, the ${c_yellow}basename${c_reset} of the FASTA and BAM files must match
+    (e.g., sample1.fasta <-> sample1.bam). 
 
     ${c_yellow}General Options:${c_reset}
     --cores             Max cores per process for local use [default: $params.cores]
@@ -131,6 +134,9 @@ def helpMSG() {
 
     ${c_yellow}Additional Options:${c_reset}${c_reset}
     --filter_threshold_modkit             Filter threshold for modkit [default: $params.filter_threshold_modkit]
+    --automatic_threshold_modkit          Enable automatic estimation of the filter threshold by modkit.
+                                          When true, modkit will determine an optimal threshold from the data and the value of --filter_threshold_modkit will be ignored.
+                                          [default: $params.automatic_threshold_modkit]
     --percent_cutoff_modification_table   Minimum methylation percentage required for genome positions to be reported in the modification tables [default: $params.percent_cutoff_modification_table].
  
     ${c_dim}Nextflow options:
