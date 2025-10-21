@@ -66,7 +66,7 @@ if (params.bam && params.list) { bam_input_ch = Channel
 
 // load modules
 include { bam2fastq; zipfastq; minimap2; index } from './modules/map_index_bam.nf'
-include { modkit_pileup; modkit_pileup_bedgraphs; modkit_find_motifs; custom_bedgraphs} from './modules/modkit.nf'
+include { modkit_pileup; modkit_pileup_bedgraphs; modkit_find_motifs; custom_bedgraphs; split_bed_by_bin} from './modules/modkit.nf'
 include { compute_statistics } from './modules/statistics.nf'
 
 
@@ -76,11 +76,9 @@ workflow {
     // combine FASTA and BAM channels to generate a channel: tuple val(sample_id), path(bam_file), path(reference) 
     bam_ref_pairs = bam_input_ch.join(fasta_input_ch)
     
-   
     fastq_files = bam2fastq(bam_ref_pairs)
     zipfastq(fastq_files)
     mapped_bams = minimap2(fastq_files)
-
 
     index_bam = index(mapped_bams)
 
@@ -89,10 +87,22 @@ workflow {
         .join(index_bam)
     
     bed_file = modkit_pileup(bam_and_index)
-    modkit_pileup_bedgraphs(bam_and_index)
-    modkit_find_motifs(bed_file)
-    custom_bedgraphs(bed_file)
-    compute_statistics(bed_file)
+
+    if (params.meta) {
+        if (!params.bin_folder) {
+            error "--bin_folder should be provided when using --meta"
+        }
+
+        bins = Channel.fromPath("${params.bin_folder}/*.fasta")
+
+        motifs = split_bed_by_bin(bed_file, bins)
+    } else {
+        modkit_pileup_bedgraphs(bam_and_index)
+        modkit_find_motifs(bed_file)
+        custom_bedgraphs(bed_file)
+        compute_statistics(bed_file)
+    }
+
 
 }
 

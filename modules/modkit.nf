@@ -73,3 +73,26 @@ process modkit_find_motifs {
     """
 }
 
+process split_bed_by_bin {
+    label 'modkit_low'
+    publishDir "${params.outdir}/split_beds", mode: 'copy'
+
+    input:
+    path bed_file
+    path bin_fa from bins
+
+    output:
+    tuple val(bin_base), path("${bin_base}.bed"), path(bin_fa) // use this to call modkit find motifs per bin
+
+    script:
+    bin_base = bin_fa.baseName() // not sure you need this
+
+    """
+    # here extract the contigs belonging to the current bin 
+    awk '/^>/{gsub(/^>/,""); split(\$1,a," "); print a[1]}' ${bin_fa} > ${bin_base}.contigs.txt
+    # here you want to filter the bed file according to to the contigs in the current bin
+    awk 'NR==FNR {keep[\$1]; next} (\$1 in keep)' ${bin_base}.contigs.txt ${bed_file} > ${bin_base}.bed
+
+    rm -f ${bin_base}.contigs.txt # not sure what is this for
+    """
+}
