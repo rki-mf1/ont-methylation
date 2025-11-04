@@ -47,37 +47,76 @@ if (params.bam && params.list) { bam_input_ch = Channel
     .map { file -> tuple(file.baseName, file) }
 }
 
-// Define the list of BAM files and reference files
-/*    params.input_files = [
-        [ file('../run_dorado_v5/barcode01/calling_barcode1.bam'), file('../run_dorado_v5/barcode01/polished_assembly_01.fasta')],
-        [ file('../run_dorado_v5/barcode02/calling_barcode02.bam'), file('../run_dorado_v5/barcode02/polished_assembly_02.fasta')],
-        [ file('../run_dorado_v5/barcode03/calling_barcode03.bam'), file('../run_dorado_v5/barcode03/polished_assembly_03.fasta')],
-        [ file('../run_dorado_v5/barcode04/calling_barcode4.bam'), file('../run_dorado_v5/barcode04/polished_assembly_04.fasta')],
-        [ file('../run_dorado_v5/barcode05/calling_barcode5.bam'), file('../run_dorado_v5/barcode05/polished_assembly_05.fasta')],
-        [ file('../run_dorado_v5/barcode06/calling_barcode6.bam'), file('../run_dorado_v5/barcode06/polished_assembly_06.fasta')],
-        [ file('../run_dorado_v5/barcode07/calling_barcode7.bam'), file('../run_dorado_v5/barcode07/polished_assembly_07.fasta')],
-        [ file('../run_dorado_v5/barcode08/calling_barcode08.bam'), file('../run_dorado_v5/barcode08/polished_assembly_08.fasta')],
-        [ file('../run_dorado_v5/barcode09/calling_barcode09.bam'), file('../run_dorado_v5/barcode09/polished_assembly_09.fasta')],
-        [ file('../run_dorado_v5/barcode10/calling_barcode10.bam'), file('../run_dorado_v5/barcode10/polished_assembly_10.fasta')],
-        [ file('../run_dorado_v5/barcode11/calling_barcode11.bam'), file('../run_dorado_v5/barcode11/polished_assembly_11.fasta')],
-        [ file('../run_dorado_v5/barcode12/calling_barcode12.bam'), file('../run_dorado_v5/barcode12/polished_assembly_12.fasta')]
-    ]
-*/
+// bins input & --meta support
+if (params.meta) {
+    if (!params.bin_folder) {
+        error "--bin_folder must be provided when using --meta"
+    }
+
+    bins = Channel
+        .fromPath("${params.bin_folder}/*.fasta", checkIfExists: true)
+        .ifEmpty { error("No bin FASTA files found in folder: ${params.bin_folder}") }
+
+    // optional debug
+    // bins.view()
+}
 
 // load modules
-include { bam2fastq; zipfastq; minimap2; index } from './modules/map_index_bam.nf'
-include { modkit_pileup; modkit_pileup_bedgraphs; modkit_find_motifs; custom_bedgraphs; split_bed_by_bin} from './modules/modkit.nf'
+include { bam2fastq; zipfastq; minimap2; split_bam_by_bin } from './modules/map_index_bam.nf'
+include { modkit_pileup; modkit_pileup_bedgraphs; modkit_find_motifs; custom_bedgraphs; publish_results_meta} from './modules/modkit.nf'
 include { compute_statistics } from './modules/statistics.nf'
 
 
 // main workflow
 workflow {
-    
-    // combine FASTA and BAM channels to generate a channel: tuple val(sample_id), path(bam_file), path(reference) 
+    fastq_files = bam2fastq(bam_input_ch)
+    zipfastq(fastq_files)
+
+    // combine the fastq files with the reference fasta files 
+    fastq_ref_pairs = fastq_files.join(fasta_input_ch)
+    mapped_bams = minimap2(fastq_ref_pairs)
+
+    // if meta mode is on, split bams by bins and call modkit per bin
+    if (params.meta) {
+        bam_bin_pairs = mapped_bams.combine(bins)
+
+        filtered_bams = split_bam_by_bin(bam_bin_pairs)
+        
+        bed_file = modkit_pileup(filtered_bams)  
+        pileup_bedgraphs_ch = modkit_pileup_bedgraphs(filtered_bams)
+        motifs_ch = modkit_find_motifs(bed_file)
+        custom_bedgraphs_ch = custom_bedgraphs(bed_file)
+        statistics_ch = compute_statistics(bed_file)
+
+
+        publish_input = bed_file.join(pileup_bedgraphs_ch)
+                                .join(motifs_ch)
+                                .join(custom_bedgraphs_ch)
+                                .join(statistics_ch)  
+
+
+        publish_results_meta(publish_input)
+
+    } else {
+        bed_file = modkit_pileup(mapped_bams)
+        //modkit_pileup_bedgraphs(bed_file)
+        //modkit_find_motifs(bed_file)
+        //custom_bedgraphs(bed_file)
+        //compute_statistics(bed_file)
+    }
+
+  
+    '''
+    // Run modkit pileup
+    bed_file = modkit_pileup(mapped_bams)
+
+
+    fasta_input_ch.view()
+    bam_input_ch.view()
     bam_ref_pairs = bam_input_ch.join(fasta_input_ch)
     
     fastq_files = bam2fastq(bam_ref_pairs)
-    zipfastq(fastq_files)
+    
     mapped_bams = minimap2(fastq_files)
 
     index_bam = index(mapped_bams)
@@ -88,21 +127,8 @@ workflow {
     
     bed_file = modkit_pileup(bam_and_index)
 
-    if (params.meta) {
-        if (!params.bin_folder) {
-            error "--bin_folder should be provided when using --meta"
-        }
 
-        bins = Channel.fromPath("${params.bin_folder}/*.fasta")
-
-        motifs = split_bed_by_bin(bed_file, bins)
-    } else {
-        modkit_pileup_bedgraphs(bam_and_index)
-        modkit_find_motifs(bed_file)
-        custom_bedgraphs(bed_file)
-        compute_statistics(bed_file)
-    }
-
+  '''
 
 }
 
