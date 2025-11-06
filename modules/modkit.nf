@@ -100,3 +100,19 @@ process publish_results_meta {
     """
     """
 }
+
+process publish_results {
+    label 'publish'
+    publishDir "${params.outdir}/${sample_id}", mode: 'copy'
+
+    input:
+    tuple val(reference_name), val(sample_id), path(reference), 
+          path(bed_file), path(pileup_bedgraphs), path(motifs), path(custom_bedgraphs), path(modifications_tables), path(statistics)
+
+    output:
+    tuple path(bed_file), path(pileup_bedgraphs), path(motifs), path(custom_bedgraphs), path(modifications_tables), path(statistics)
+
+    script:
+    """
+    """
+}

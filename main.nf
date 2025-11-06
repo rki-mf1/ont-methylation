@@ -57,13 +57,11 @@ if (params.meta) {
         .fromPath("${params.bin_folder}/*.fasta", checkIfExists: true)
         .ifEmpty { error("No bin FASTA files found in folder: ${params.bin_folder}") }
 
-    // optional debug
-    // bins.view()
 }
 
 // load modules
 include { bam2fastq; zipfastq; minimap2; split_bam_by_bin } from './modules/map_index_bam.nf'
-include { modkit_pileup; modkit_pileup_bedgraphs; modkit_find_motifs; custom_bedgraphs; publish_results_meta} from './modules/modkit.nf'
+include { modkit_pileup; modkit_pileup_bedgraphs; modkit_find_motifs; custom_bedgraphs; publish_results_meta; publish_results} from './modules/modkit.nf'
 include { compute_statistics } from './modules/statistics.nf'
 
 
@@ -76,60 +74,33 @@ workflow {
     fastq_ref_pairs = fastq_files.join(fasta_input_ch)
     mapped_bams = minimap2(fastq_ref_pairs)
 
-    // if meta mode is on, split bams by bins and call modkit per bin
+    // if meta mode is on, split bams by bins first 
     if (params.meta) {
         bam_bin_pairs = mapped_bams.combine(bins)
-
         filtered_bams = split_bam_by_bin(bam_bin_pairs)
         
         bed_file = modkit_pileup(filtered_bams)  
         pileup_bedgraphs_ch = modkit_pileup_bedgraphs(filtered_bams)
-        motifs_ch = modkit_find_motifs(bed_file)
-        custom_bedgraphs_ch = custom_bedgraphs(bed_file)
-        statistics_ch = compute_statistics(bed_file)
-
-
-        publish_input = bed_file.join(pileup_bedgraphs_ch)
-                                .join(motifs_ch)
-                                .join(custom_bedgraphs_ch)
-                                .join(statistics_ch)  
-
-
-        publish_results_meta(publish_input)
-
     } else {
-        bed_file = modkit_pileup(mapped_bams)
-        //modkit_pileup_bedgraphs(bed_file)
-        //modkit_find_motifs(bed_file)
-        //custom_bedgraphs(bed_file)
-        //compute_statistics(bed_file)
+        bed_file = modkit_pileup(mapped_bams)  
+        pileup_bedgraphs_ch = modkit_pileup_bedgraphs(mapped_bams)
+    }
+
+    motifs_ch = modkit_find_motifs(bed_file)
+    custom_bedgraphs_ch = custom_bedgraphs(bed_file)
+    statistics_ch = compute_statistics(bed_file)
+
+    publish_input = bed_file.join(pileup_bedgraphs_ch)
+                            .join(motifs_ch)
+                            .join(custom_bedgraphs_ch)
+                            .join(statistics_ch)  
+    if (params.meta) {
+        publish_results_meta(publish_input)
+    } else {
+        publish_results(publish_input)
     }
 
   
-    '''
-    // Run modkit pileup
-    bed_file = modkit_pileup(mapped_bams)
-
-
-    fasta_input_ch.view()
-    bam_input_ch.view()
-    bam_ref_pairs = bam_input_ch.join(fasta_input_ch)
-    
-    fastq_files = bam2fastq(bam_ref_pairs)
-    
-    mapped_bams = minimap2(fastq_files)
-
-    index_bam = index(mapped_bams)
-
-    // Join the channels by sample ID
-    bam_and_index = mapped_bams
-        .join(index_bam)
-    
-    bed_file = modkit_pileup(bam_and_index)
-
-
-  '''
-
 }
 
 // --help
