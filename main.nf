@@ -72,6 +72,11 @@ workflow {
 
     // combine the fastq files with the reference fasta files 
     fastq_ref_pairs = fastq_files.join(fasta_input_ch)
+    fastq_ref_pairs
+    .ifEmpty { 
+        error "❌ No matching FASTA found for BAM samples (example: sample1.bam and sample1.fasta). " +
+              "Check naming or provide --list mapping file with explicit sample-to-genome pairs." 
+    }
     mapped_bams = minimap2(fastq_ref_pairs)
 
     // if meta mode is on, split bams by bins first 
