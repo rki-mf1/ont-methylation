@@ -61,7 +61,7 @@ if (params.meta) {
 
 // load modules
 include { bam2fastq; zipfastq; minimap2; split_bam_by_bin } from './modules/map_index_bam.nf'
-include { modkit_pileup; modkit_pileup_bedgraphs; modkit_find_motifs; custom_bedgraphs; publish_results_meta; publish_results} from './modules/modkit.nf'
+include { modkit_pileup; modkit_pileup_bedgraphs; modkit_find_motifs; custom_bedgraphs; publish_results_meta; publish_results_motifs_meta; publish_results; publish_results_motifs} from './modules/modkit.nf'
 include { compute_statistics } from './modules/statistics.nf'
 
 
@@ -91,13 +91,17 @@ workflow {
     statistics_ch = compute_statistics(bed_file)
 
     publish_input = bed_file.join(pileup_bedgraphs_ch)
-                            .join(motifs_ch)
                             .join(custom_bedgraphs_ch)
-                            .join(statistics_ch)  
+                            .join(statistics_ch) 
+
+    publish_motifs_input = bed_file.join(motifs_ch)
+
     if (params.meta) {
         publish_results_meta(publish_input)
+        publish_results_motifs_meta(publish_motifs_input)
     } else {
         publish_results(publish_input)
+        publish_results_motifs(publish_motifs_input)
     }
 
   
