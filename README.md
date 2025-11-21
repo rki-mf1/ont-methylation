@@ -15,8 +15,10 @@ Schematic overview of the pipeline:
 
 ## Input
 
-- **Basecalled reads**:  Outputs from Dorado in BAM file format, which include basecalled DNA modifications. See [[Basecalling with Dorado]([https://github.com/valegale/ONT_methylation/wiki/Usage](https://github.com/rki-mf1/ont-methylation/wiki/Basecalling-with-Dorado))](https://github.com/rki-mf1/ont-methylation/wiki/Getting-Started-with-ONT%E2%80%90methylation) for details. To verify that modification information is present, check that the BAM file contains the `MM` and `ML` tags.
+- **Basecalled reads**:  Outputs from Dorado in BAM file format, which include basecalled DNA modifications. See [Basecalling with Dorado](https://github.com/rki-mf1/ont-methylation/wiki/Basecalling-with-Dorado) for details. To verify that modification information is present, check that the BAM file contains the `MM` and `ML` tags.
 - **Reference file**: A reference genome or sequence against which the reads will be aligned. The assembly obtained from the BAM files is recommended (e.g., by _de novo_ assembly with [flye](https://github.com/mikolmogorov/Flye)). 
+
+
 
 ## Output
 
@@ -61,7 +63,8 @@ You can also `git clone` this repository and run the pipeline via `nextflow run 
 
 ## How to Run
 
-For a brief introduction and a step-by-step example of running the pipeline, see the wiki page [Getting Started with ONT‐methylation](Getting Started with ONT‐methylation) for a small introduction and a practical example on how to run the pipeline. 
+For a brief introduction and a step-by-step example of running the pipeline, see the wiki page [Getting Started with ONT‐methylation](https://github.com/rki-mf1/ont-methylation/wiki/Getting-Started-with-ONT%E2%80%90methylation)) for a small introduction and a practical example on how to run the pipeline. 
+
 
 To run the pipeline with a single reference and BAM file, use the following command (**adjust the `-r` version as necessary**):
 
@@ -122,7 +125,7 @@ It is also possible to run the pipeline starting from metagenomic data, using th
 
 For simplicity, only **one metagenome** can be processed at a time, meaning one BAM and one FASTA file should be provided.  
 
-A practical example and step-by-step instructions are available on the wiki page [Getting Started with ONT-methylation](https://github.com/rki-mf1/ont-methylation/wiki/Metagenomic-pipeline-example-(%E2%80%90meta)).  
+A practical example and step-by-step instructions are available on this [wiki page](https://github.com/rki-mf1/ont-methylation/wiki/Metagenomic-pipeline-example-(%E2%80%90meta)).  
 
 
 ### Running with Containers
