@@ -12,9 +12,10 @@ Schematic overview of the pipeline:
 
 ![Alt text](images/workflow.png)
 
+
 ## Input
 
-- **Basecalled reads**:  Outputs from Dorado in BAM file format, which include basecalled DNA modifications. See [Basecalling with Dorado](#basecalling-with-dorado) for details.
+- **Basecalled reads**:  Outputs from Dorado in BAM file format, which include basecalled DNA modifications. See [Preparing input: Basecalling with Dorado](Basecalling-with-Dorado)) for details. To verify that modification information is present, check that the BAM file contains the `MM` and `ML` tags.
 - **Reference file**: A reference genome or sequence against which the reads will be aligned. The assembly obtained from the BAM files is recommended (e.g., by _de novo_ assembly with [flye](https://github.com/mikolmogorov/Flye)). 
 
 ## Output
@@ -39,50 +40,6 @@ However, if this does not work for you, you can also install Nextflow via [conda
 
 To avoid installing all necessary tool dependencies manually, we recommend using [Docker](https://docs.docker.com/get-started/get-docker/) or [Singularity](https://docs.sylabs.io/guides/3.0/user-guide/installation.html). Nextflow will then handle all your dependencies using the Docker or Singularity profile (see below). Alternatively, pre-configured conda environments are also available in the pipeline (see [Running with Containers](#Running-with-containers) for details on how to use containers). 
 
-
-### Preparing input: Basecalling with Dorado 
-
-Your Nanopore data needs to be basecalled in a methylation-aware way to be usable as input for the pipeline. [Dorado](https://github.com/nanoporetech/dorado) is the official open-source basecaller for Oxford Nanopore reads. To basecall pod5 files, it is strongly recommended to use the v5 models in super high accuracy mode (SUP), as these include detection for 6mA, 5mC, and 4mC modifications.
-
-The following command will download the most recent models with super accuracy mode, using the methylation models for 6mA, 4mC and 5mC as well, and run Dorado. 
-
-```bash
-dorado basecaller sup,6mA,4mC_5mC <pod5_folder_path> >  results.bam
-```
-   
-Alternatively, you can download specific models individually. In this case, you would need to download the basecalling model and the methylation models separately, then modify the Dorado command accordingly:
-   
-```bash
-dorado download --model dna_r10.4.1_e8.2_400bps_sup@v5.0.0
-dorado download --model dna_r10.4.1_e8.2_400bps_sup@v5.0.0_6mA@v1
-dorado download --model dna_r10.4.1_e8.2_400bps_sup@v5.0.0_4mC_5mC@v1
-```
-
-Once the models are downloaded, you can run Dorado using the command below, specifying the basecalling model and adding the methylation models for modified bases:
-
-```bash
-dorado basecaller dna_r10.4.1_e8.2_400bps_sup@v5.0.0 <pod5_folder_path> --modified-bases-models dna_r10.4.1_e8.2_400bps_sup@v5.0.0_6mA@v1,dna_r10.4.1_e8.2_400bps_sup@v5.0.0_4mC_5mC@v1  > results.bam
-```
-
-#### Using Dorado duplex
-
-Another option is to basecall with Dorado in duplex mode, which has recently been updated to support modification detection.
-
-```bash
-dorado duplex sup,6mA,4mC_5mC <pod5_folder_path> > results.bam
-```
-
-The `dx` tag in the BAM record allows you to distinguish between simplex and duplex reads. You can use this tag to filter out redundant reads if necessary.
-
-However, it is not yet clear if duplex basecalling offers significant benefits for downstream analysis, as modification calls are still made on only one DNA strand.
-
-#### Basecalling with LARRI
-Alternatively, [**LARRI**](https://github.com/rki-mf1/LARRI), another pipeline we developed, supports basecalling and assembly directly from pod5 files. It is possible to run the pipeline to simply basecall the pod5, also calling for methylation:
-
-```bash
-nextflow run rki-mf1/LARRI -r 0.0.1 --pod5 <pod5_folder_path> --basecalling --modifications
-```
-
 ## How to install and update the pipeline
 
 To install the pipeline, simply use Nextflow:
@@ -104,6 +61,8 @@ You can also `git clone` this repository and run the pipeline via `nextflow run 
 
 ## How to Run
 
+For a brief introduction and a step-by-step example of running the pipeline, see the wiki page [Getting Started with ONT‐methylation](Getting Started with ONT‐methylation) for a small introduction and a practical example on how to run the pipeline. 
+
 To run the pipeline with a single reference and BAM file, use the following command (**adjust the `-r` version as necessary**):
 
 ```bash
@@ -114,7 +73,7 @@ nextflow run rki-mf1/ont-methylation -r 0.0.1 --fasta sample_test.fasta --bam sa
 
    
 - **fasta** specifies the reference genome file in FASTA format.
-- **bam** specifies the basecalled BAM file output from Dorado (see above).
+- **bam** specifies the basecalled BAM file output from Dorado.
 
 If you have multiple references and BAM files, you can provide them using wildcard patterns (`*`). For example:
 
@@ -151,6 +110,19 @@ sample1,/path/to/mapping1.bam
 sample2,/path/to/mapping2.bam
 sample3,/path/to/another/mapping3.bam
 ```
+
+### Running the pipeline on metagenomic data
+
+It is also possible to run the pipeline starting from metagenomic data, using the `-meta` option. In this scenario, the assembly and binning must be performed separately before running the pipeline. The pipeline expects the following inputs:
+
+1. A **BAM file** produced by Dorado containing basecalled reads with modification information.  
+2. A **FASTA file** containing the polished assembly of the metagenome.  
+3. A **bin folder**, where each bin is already separated into individual FASTA files. The path to this folder should be provided to the pipeline using the `--bins_folder` parameter.
+
+
+For simplicity, only **one metagenome** can be processed at a time, meaning one BAM and one FASTA file should be provided.  
+
+A practical example and step-by-step instructions are available on the wiki page [Getting Started with ONT-methylation](Getting Started with ONT-methylation).  
 
 
 ### Running with Containers
@@ -224,3 +196,4 @@ MicrobeMod call_methylation -b <path_to_the_results_folder>/methylation_mapped.b
 If you use this pipeline in your research, please cite the following:
 
 Galeone, V., Dabernig-Heinz, J., Lohde, M. et al. Decoding bacterial methylomes in four public health-relevant microbial species: nanopore sequencing enables reproducible analysis of DNA modifications. *BMC Genomics* **26**, 394 (2025). https://doi.org/10.1186/s12864-025-11592-z
+
