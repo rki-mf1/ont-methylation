@@ -15,7 +15,7 @@ println " "
 // error codes
 if (params.profile) { exit 1, "--profile is WRONG use -profile" }
 if ( !workflow.revision ) { 
-  println "\033[0;33mWARNING: It is recommended to use a stable relese version via -r." 
+  println "\033[0;33mWARNING: It is recommended to use a stable release version via -r." 
   println "Use 'nextflow info valegale/ONT_methylation' to check for available release versions.\033[0m\n"
 }
 // help
@@ -49,14 +49,24 @@ if (params.bam && params.list) { bam_input_ch = Channel
 
 // bins input & --meta support
 if (params.meta) {
+      
     if (!params.bin_folder) {
         error "--bin_folder must be provided when using --meta"
     }
 
     bins = Channel
-        .fromPath("${params.bin_folder}/*.fasta", checkIfExists: true)
+        .fromPath("${params.bin_folder}/*.{fasta,fa}", checkIfExists: true)
         .ifEmpty { error("No bin FASTA files found in folder: ${params.bin_folder}") }
+    
+    fasta_input_ch.count()
+        .map { cnt ->
+            if (cnt != 1) error "Exactly one FASTA file must be provided when using -meta. Found: ${cnt}"
+        }
 
+    bam_input_ch.count()
+        .map { cnt ->
+            if (cnt != 1) error "Exactly one BAM file must be provided when using -meta. Found: ${cnt}"
+        }
 }
 
 // load modules

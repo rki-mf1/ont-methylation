@@ -67,7 +67,7 @@ process custom_bedgraphs {
 process modkit_find_motifs {
     label 'modkit_low'
     // find motifs from the output of modkit pileup
-    errorStrategy 'ignore'
+    //errorStrategy 'ignore'
 
     input:
     tuple val(reference_name), val(sample_id), path(reference), path(bed_file)
@@ -77,9 +77,6 @@ process modkit_find_motifs {
 
     script:
     """
-    set -e
-    trap 'echo "⚠️ Warning: process failed or timed out, producing empty result" >&2; touch modkit_motifs.tsv' ERR
-
     modkit find-motifs -t ${task.cpus} --in-bedmethyl ${bed_file} --ref ${reference} -o modkit_motifs.tsv
     """
     stub:
