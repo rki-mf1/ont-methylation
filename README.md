@@ -63,7 +63,7 @@ You can also `git clone` this repository and run the pipeline via `nextflow run 
 
 ## How to Run
 
-For a brief introduction and a step-by-step example of running the pipeline, see the wiki page [Getting Started with ONT‐methylation](https://github.com/rki-mf1/ont-methylation/wiki/Getting-Started-with-ONT%E2%80%90methylation)) for a small introduction and a practical example on how to run the pipeline. 
+For a brief introduction and a step-by-step example of running the pipeline, see the wiki page [Getting Started with ONT‐methylation](https://github.com/rki-mf1/ont-methylation/wiki/Getting-Started-with-ONT%E2%80%90methylation) for a small introduction and a practical example on how to run the pipeline. 
 
 
 To run the pipeline with a single reference and BAM file, use the following command (**adjust the `-r` version as necessary**):
