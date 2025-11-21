@@ -15,7 +15,7 @@ Schematic overview of the pipeline:
 
 ## Input
 
-- **Basecalled reads**:  Outputs from Dorado in BAM file format, which include basecalled DNA modifications. See [Basecalling with Dorado]([https://github.com/valegale/ONT_methylation/wiki/Usage](https://github.com/rki-mf1/ont-methylation/wiki/Basecalling-with-Dorado)) for details. To verify that modification information is present, check that the BAM file contains the `MM` and `ML` tags.
+- **Basecalled reads**:  Outputs from Dorado in BAM file format, which include basecalled DNA modifications. See [[Basecalling with Dorado]([https://github.com/valegale/ONT_methylation/wiki/Usage](https://github.com/rki-mf1/ont-methylation/wiki/Basecalling-with-Dorado))](https://github.com/rki-mf1/ont-methylation/wiki/Getting-Started-with-ONT%E2%80%90methylation) for details. To verify that modification information is present, check that the BAM file contains the `MM` and `ML` tags.
 - **Reference file**: A reference genome or sequence against which the reads will be aligned. The assembly obtained from the BAM files is recommended (e.g., by _de novo_ assembly with [flye](https://github.com/mikolmogorov/Flye)). 
 
 ## Output
