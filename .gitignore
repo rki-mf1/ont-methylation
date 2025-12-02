@@ -7,3 +7,4 @@ singularity/
 report*
 conda/
 nohup.out
+data/
