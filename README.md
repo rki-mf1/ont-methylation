@@ -116,7 +116,7 @@ sample3,/path/to/another/mapping3.bam
 
 ### Running the pipeline on metagenomic data
 
-It is also possible to run the pipeline starting from metagenomic data, using the `-meta` option. In this scenario, the assembly and binning must be performed separately before running the pipeline. The pipeline expects the following inputs:
+It is also possible to run the pipeline starting from metagenomic data, using the `--meta` option. In this scenario, the assembly and binning must be performed separately before running the pipeline. The pipeline expects the following inputs:
 
 1. A **BAM file** produced by Dorado containing basecalled reads with modification information.  
 2. A **FASTA file** containing the polished assembly of the metagenome.  
