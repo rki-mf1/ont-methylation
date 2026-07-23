@@ -1,4 +1,3 @@
-// load modules
 include { bam2fastq; zipfastq; minimap2; split_bam_by_bin } from '../modules/map_index_bam.nf'
 include { modkit_pileup; modkit_pileup_bedgraphs; modkit_find_motifs; custom_bedgraphs; publish_results_meta; publish_results_motifs_meta; publish_results; publish_results_motifs} from '../modules/modkit.nf'
 include { compute_statistics } from '../modules/statistics.nf'

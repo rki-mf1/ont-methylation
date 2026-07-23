@@ -16,7 +16,7 @@ println " "
 if (params.profile) { exit 1, "--profile is WRONG use -profile" }
 if ( !workflow.revision ) { 
   println "\033[0;33mWARNING: It is recommended to use a stable release version via -r." 
-  println "Use 'nextflow info valegale/ONT_methylation' to check for available release versions.\033[0m\n"
+  println "Use 'nextflow info valegale/ONT_methylation' to check for available release versions.\033[0m\n"   // TODO
 }
 // help
 if (params.help) { exit 0, helpMSG() }
@@ -61,21 +61,19 @@ if (params.flow == 'main') {
 
 } else if (params.flow == 'annotation') {
 
-    if (!params.bed)   { error "❌ --bed is required for --flow annotation" }
-    if (!params.fasta) { error "❌ --fasta is required for --flow annotation" }
-    if (!params.gff3)  { error "❌ --gff3 is required for --flow annotation" }
-
-    bed_input_ch = Channel
-        .fromPath(params.bed, checkIfExists: true)
-        .map { file -> tuple(file.baseName, file) }
+    if (!params.modkit_bed) { error "❌ --modkit_bed is required for --flow annotation" }
+    if (!params.fasta)      { error "❌ --fasta is required for --flow annotation" }
+    if (!params.gff3)       { error "❌ --gff3 is required for --flow annotation" }
 
     fasta_input_ch = Channel
         .fromPath(params.fasta, checkIfExists: true)
         .map { file -> tuple(file.baseName, file) }
 
+    modkit_bed_input_ch = Channel
+        .fromPath(params.modkit_bed, checkIfExists: true)
+
     gff3_input_ch = Channel
         .fromPath(params.gff3, checkIfExists: true)
-        .map { file -> tuple(file.baseName, file) }
 
 } else if (params.flow == 'dmr') {
 
@@ -86,7 +84,6 @@ if (params.flow == 'main') {
 
 }
 
-// include workflows
 include { MAIN_FLOW }       from './workflows/main_flow'
 include { ANNOTATION_FLOW } from './workflows/annotation_flow'
 
@@ -97,8 +94,8 @@ workflow {
         MAIN_FLOW(bam_input_ch, fasta_input_ch)
     } else if (params.flow == 'annotation') {
         ANNOTATION_FLOW(
-            bed_input_ch,
             fasta_input_ch,
+            modkit_bed_input_ch,
             gff3_input_ch
         )
     } else if (params.flow == 'dmr') {
