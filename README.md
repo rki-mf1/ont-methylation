@@ -59,7 +59,7 @@ nextflow pull rki-mf1/ont-methylation
 
 **Check to use the latest pipeline release version**. To have reproducible results, use the same version. 
 
-You can also `git clone` this repository and run the pipeline via `nextflow run main.nf` - but we do not recommend this. 
+You can also `git clone` this repository and run the pipeline via `nextflow run ont-bmod.nf` - but we do not recommend this. 
 
 ## How to Run
 
