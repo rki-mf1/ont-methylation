@@ -2,6 +2,7 @@
 .DS_Store
 results/
 work/
+gui_runs/
 timeline*.html
 singularity/
 report*
