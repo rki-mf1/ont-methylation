@@ -48,10 +48,17 @@ if (params.flow == 'main') {
 
     bins = Channel.empty()
     if (params.meta) {
-        if (!params.bin_folder) { error "--bin_folder must be provided when using --meta" }
-        bins = Channel
-            .fromPath("${params.bin_folder}/*.{fasta,fa}", checkIfExists: true)
-            .ifEmpty { error("No bin FASTA files found in folder: ${params.bin_folder}") }
+        if (!params.bin_folder) { error "❌ --bin_folder must be provided when using --meta" }
+        bin_dir = file(params.bin_folder)
+        if (!bin_dir.isDirectory()) {
+            error "❌ --bin_folder does not exist or is not a directory: ${params.bin_folder}"
+        }
+        bin_files = bin_dir.listFiles()?.findAll { it.name ==~ /.*\.(fasta|fa)$/ } ?: []
+        if (bin_files.isEmpty()) {
+            error "❌ No bin FASTA files (*.fasta or *.fa) found in --bin_folder: ${params.bin_folder}. " +
+                  "Make sure the results from binning are organized in bin FASTA files and placed directly in this folder."
+        }
+        bins = Channel.fromPath("${params.bin_folder}/*.{fasta,fa}", checkIfExists: true)
         fasta_input_ch.count().map { cnt ->
             if (cnt != 1) error "Exactly one FASTA file must be provided when using --meta. Found: ${cnt}"
         }
