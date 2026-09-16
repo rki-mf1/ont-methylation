@@ -6,6 +6,7 @@ workflow MAIN_FLOW {
     take:
         bam_input_ch
         fasta_input_ch
+        bins_ch
     main:
         fastq_files = bam2fastq(bam_input_ch)
         zipfastq(fastq_files)
@@ -21,7 +22,7 @@ workflow MAIN_FLOW {
 
         // if meta mode is on, split bams by bins first 
         if (params.meta) {
-            bam_bin_pairs = mapped_bams.combine(bins)
+            bam_bin_pairs = mapped_bams.combine(bins_ch)
             filtered_bams = split_bam_by_bin(bam_bin_pairs)
             
             bed_file = modkit_pileup(filtered_bams)  

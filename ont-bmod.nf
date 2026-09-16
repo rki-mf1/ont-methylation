@@ -46,6 +46,7 @@ if (params.flow == 'main') {
         .map { file -> tuple(file.baseName, file) }
     }
 
+    bins = Channel.empty()
     if (params.meta) {
         if (!params.bin_folder) { error "--bin_folder must be provided when using --meta" }
         bins = Channel
@@ -91,7 +92,7 @@ params.flow = 'main'
 
 workflow {
     if (params.flow == 'main') {
-        MAIN_FLOW(bam_input_ch, fasta_input_ch)
+        MAIN_FLOW(bam_input_ch, fasta_input_ch, bins)
     } else if (params.flow == 'annotation') {
         ANNOTATION_FLOW(
             fasta_input_ch,
