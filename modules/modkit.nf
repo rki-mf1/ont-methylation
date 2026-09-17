@@ -21,21 +21,28 @@ process modkit_pileup {
 
 process modkit_pileup_bedgraphs {
     label 'modkit'
-    // execute the modkit pileup command to obtain the bedgraphs
-    
+    // execute the modkit pileup command and convert to per-modification bigWig tracks
+    // (`pileup --bedgraph` was removed in modkit v0.6.0; bigWig is the recommended replacement,
+    // see https://github.com/nanoporetech/modkit/blob/master/book/src/migrating_060.md)
+
     input:
     tuple val(sample_id), path(mapped_bam), path(mapped_bam_bai), path(reference)
 
     output:
-    tuple val(reference.baseName), path("bedgraphs")
+    tuple val(reference.baseName), path("bigwigs")
 
     script:
     """
-    modkit pileup -t ${task.cpus} ${mapped_bam} --bedgraph bedgraphs --filter-threshold ${params.filter_threshold_modkit} 
+    modkit pileup -t ${task.cpus} ${mapped_bam} modkit_pileup_bedgraph_output.bed --filter-threshold ${params.filter_threshold_modkit}
+    mkdir -p bigwigs
+    modkit bedmethyl tobigwig modkit_pileup_bedgraph_output.bed bigwigs/6mA.bw --mod-codes a --header ${mapped_bam} --negative-strand-values -t ${task.cpus}
+    modkit bedmethyl tobigwig modkit_pileup_bedgraph_output.bed bigwigs/5mC.bw --mod-codes m --header ${mapped_bam} --negative-strand-values -t ${task.cpus}
+    modkit bedmethyl tobigwig modkit_pileup_bedgraph_output.bed bigwigs/4mC.bw --mod-codes 21839 --header ${mapped_bam} --negative-strand-values -t ${task.cpus}
     """
     stub:
     """
-    mkdir -p bedgraphs
+    mkdir -p bigwigs
+    touch bigwigs/6mA.bw bigwigs/5mC.bw bigwigs/4mC.bw
     """
 }
 
@@ -67,6 +74,7 @@ process custom_bedgraphs {
 process modkit_find_motifs {
     label 'modkit_low'
     // find motifs from the output of modkit pileup
+    // `find-motifs` was renamed to `motif search` in modkit v0.6.0 (same flags)
     //errorStrategy 'ignore'
 
     input:
@@ -77,7 +85,7 @@ process modkit_find_motifs {
 
     script:
     """
-    modkit find-motifs -t ${task.cpus} --in-bedmethyl ${bed_file} --ref ${reference} -o modkit_motifs.tsv
+    modkit motif search -t ${task.cpus} --in-bedmethyl ${bed_file} --ref ${reference} -o modkit_motifs.tsv
     """
     stub:
     """

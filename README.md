@@ -25,7 +25,7 @@ Schematic overview of the pipeline:
 - **Motif analysis with Modkit**: Identified motifs based on DNA modifications using Modkit.
 - **Statistical analysis**: Summary statistics of the methylation status for each contig in the reference genome.
 - **List of methylated positions**: A list of methylated positions relative to the reference genome, including only those with a confidence level above a custom threshold.
-- **BedGraph files for IGV visualization** BedGraph files produced by Modkit and custom refined BedGraph files are provided, displaying methylation confidence for each base. These files can be loaded into [IGV](https://igv.org/) for visualization as annotation tracks.
+- **Tracks for IGV visualization** BigWig tracks produced by Modkit and custom refined BedGraph files are provided, displaying methylation confidence for each base. These files can be loaded into [IGV](https://igv.org/) for visualization as annotation tracks.
 
 
 ## Requirements
@@ -164,13 +164,13 @@ The intermediate output file, `modkit_pileup_output.bed`, is a tab-separated fil
 
 Methylation statistics are stored in the `methylation_statistics` folder. Separate tables are created for each modification, with the percentage of methylation calculated by dividing the number of methylated bases (those exceeding the Modkit threshold) by the total number of relevant bases (A for 6mA, C for 4mC and 5mC).
 
-### List of Methylated Positions and BedGraph files for Visualization
+### List of Methylated Positions and Tracks for Visualization
 
 To extract the list of likely methylated positions, the output from Modkit (`modkit_pileup_output.bed`) must undergo filtering and refining (see [How Percent modified is computed](#How-percent-modified-is-computed) for more information). The tables containing these lists are located in the `modification_tables` folder.
 
 Only positions with coverage greater than 10 and a methylation confidence above a specified threshold are included (default = 0.5). This threshold can be adjusted using the parameter `--percent_cutoff_modification_table`.
 
-The BedGraph files generated directly from Modkit can be found in the `bedgraphs` folder, while the preprocessed BedGraph files, which reflect the same values as in the `modification_tables`, are located in the `bedgraphs_customized` folder.
+The bigWig tracks generated directly from Modkit (one per modification: 6mA, 5mC, 4mC) can be found in the `bigwigs` folder, for loading into [IGV](https://igv.org/) as annotation tracks. The preprocessed BedGraph files, which reflect the same values as in the `modification_tables`, are located in the `bedgraphs_customized` folder.
 
 ## How "Percent Modified" is Computed
 

@@ -1,6 +1,7 @@
 include { bam2fastq; zipfastq; minimap2; split_bam_by_bin } from '../modules/map_index_bam.nf'
 include { modkit_pileup; modkit_pileup_bedgraphs; modkit_find_motifs; custom_bedgraphs; publish_results_meta; publish_results_motifs_meta; publish_results; publish_results_motifs} from '../modules/modkit.nf'
 include { compute_statistics } from '../modules/statistics.nf'
+include { capture_minimap2_samtools_version; capture_modkit_version; write_versions_summary } from '../modules/versions.nf'
 
 workflow MAIN_FLOW {
     take:
@@ -49,6 +50,8 @@ workflow MAIN_FLOW {
             publish_results(publish_input)
             publish_results_motifs(publish_motifs_input)
         }
+
+        write_versions_summary(capture_minimap2_samtools_version(), capture_modkit_version())
 
     emit:
         bed_file
