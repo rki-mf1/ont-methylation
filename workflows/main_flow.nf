@@ -1,5 +1,5 @@
 include { bam2fastq; zipfastq; minimap2; split_bam_by_bin } from '../modules/map_index_bam.nf'
-include { modkit_pileup; modkit_pileup_bedgraphs; modkit_find_motifs; custom_bedgraphs; publish_results_meta; publish_results_motifs_meta; publish_results; publish_results_motifs} from '../modules/modkit.nf'
+include { modkit_pileup; modkit_pileup_bigwigs; modkit_find_motifs; compute_methylation_tracks; methylation_tracks_to_bigwig; publish_results_meta; publish_results_motifs_meta; publish_results; publish_results_motifs} from '../modules/modkit.nf'
 include { compute_statistics } from '../modules/statistics.nf'
 include { capture_minimap2_samtools_version; capture_modkit_version; write_versions_summary } from '../modules/versions.nf'
 
@@ -26,20 +26,23 @@ workflow MAIN_FLOW {
             bam_bin_pairs = mapped_bams.combine(bins_ch)
             filtered_bams = split_bam_by_bin(bam_bin_pairs)
             
-            bed_file = modkit_pileup(filtered_bams)  
-            pileup_bedgraphs_ch = modkit_pileup_bedgraphs(filtered_bams)
+            bed_file = modkit_pileup(filtered_bams)
+            bigwigs_modkit_ch = modkit_pileup_bigwigs(filtered_bams)
         } else {
-            bed_file = modkit_pileup(mapped_bams)  
-            pileup_bedgraphs_ch = modkit_pileup_bedgraphs(mapped_bams)
+            bed_file = modkit_pileup(mapped_bams)
+            bigwigs_modkit_ch = modkit_pileup_bigwigs(mapped_bams)
         }
 
         motifs_ch = modkit_find_motifs(bed_file)
-        custom_bedgraphs_ch = custom_bedgraphs(bed_file)
+        methylation_tracks = compute_methylation_tracks(bed_file)
+        bigwigs_custom_ch = methylation_tracks_to_bigwig(methylation_tracks.tracks)
+        modifications_tables_ch = methylation_tracks.tables
         statistics_ch = compute_statistics(bed_file)
 
-        publish_input = bed_file.join(pileup_bedgraphs_ch)
-                                .join(custom_bedgraphs_ch)
-                                .join(statistics_ch) 
+        publish_input = bed_file.join(bigwigs_modkit_ch)
+                                .join(bigwigs_custom_ch)
+                                .join(modifications_tables_ch)
+                                .join(statistics_ch)
 
         publish_motifs_input = bed_file.join(motifs_ch)
 

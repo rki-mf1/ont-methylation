@@ -170,7 +170,9 @@ To extract the list of likely methylated positions, the output from Modkit (`mod
 
 Only positions with coverage greater than 10 and a methylation confidence above a specified threshold are included (default = 0.5). This threshold can be adjusted using the parameter `--percent_cutoff_modification_table`.
 
-The bigWig tracks generated directly from Modkit (one per modification: 6mA, 5mC, 4mC) can be found in the `bigwigs` folder, for loading into [IGV](https://igv.org/) as annotation tracks. The preprocessed BedGraph files, which reflect the same values as in the `modification_tables`, are located in the `bedgraphs_customized` folder.
+Two sets of bigWig tracks (one per modification: 6mA, 5mC, 4mC) are produced for loading into [IGV](https://igv.org/) as annotation tracks, both signed by strand (positive value = + strand, negative value = - strand):
+- `bigwigs_modkit`: built directly by Modkit's own `bedmethyl tobigwig`.
+- `bigwigs_custom`: built from this pipeline's own percent-modified calculation (same values as in `modification_tables`). Where both strands have a call at the same position, the strand with higher total coverage is kept.
 
 ## How "Percent Modified" is Computed
 
