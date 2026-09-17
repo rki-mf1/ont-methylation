@@ -63,7 +63,7 @@ process compute_methylation_tracks {
     """
     mkdir -p modifications_tables
 
-    custom_bedgraphs.py ${bed_file} ${reference} . --percent_cutoff ${params.percent_cutoff_modification_table}
+    compute_methylation_tracks_igv.py ${bed_file} ${reference} . --percent_cutoff ${params.percent_cutoff_modification_table}
     """
     stub:
     """
@@ -75,7 +75,7 @@ process compute_methylation_tracks {
 
 process methylation_tracks_to_bigwig {
     label 'ucsc_tools'
-    // convert our own signed bedGraph tracks (custom_bedgraphs.py's calculation) into bigWig files for IGV
+    // convert our own signed bedGraph tracks (compute_methylation_tracks_igv.py's calculation) into bigWig files for IGV
 
     input:
     tuple val(reference_name), path(modification_tracks), path(chrom_sizes)
