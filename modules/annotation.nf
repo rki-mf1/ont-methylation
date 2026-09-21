@@ -25,7 +25,8 @@ process methylation_density {
         --window_size                ${params.window_size} \
         --step_size                  ${params.step_size} \
         --smoothing_window           ${params.smoothing_window} \
-        --enrichment_threshold       ${params.enrichment_threshold}
+        --enrichment_threshold       ${params.enrichment_threshold} \
+        --min_sites                  ${params.min_sites_annotation}
     """
     stub:
     """

@@ -16,7 +16,7 @@ from utils import parse_gff3_gene_names, read_modkit
 MOD_CODES = {
     "6mA": "a",
     "5mC": "m",
-    "4mC": 21839,
+    "4mC": "21839",
 }
 
 
@@ -34,6 +34,7 @@ def parse_args():
     p.add_argument("--step_size",                  type=int,   default=10)
     p.add_argument("--smoothing_window",           type=int,   default=100)
     p.add_argument("--enrichment_threshold",       type=float, default=3.0)
+    p.add_argument("--min_sites",                  type=int,   default=50)
     return p.parse_args()
 
 
@@ -44,6 +45,9 @@ def compute_genome_density(mod_positions, genome_length, window_size, step_size)
         for pos in genome_positions
     ])
     return genome_positions + window_size // 2, counts
+
+
+PEAKS_COLUMNS = ["Peak_Position", "Density", "Count", "Gene", "Gene_Start", "Gene_End", "Strand"]
 
 
 def annotate_peaks(peak_positions, peak_heights, peak_counts, annotation):
@@ -59,6 +63,8 @@ def annotate_peaks(peak_positions, peak_heights, peak_counts, annotation):
             rows.append(dict(Peak_Position=int(pos), Density=round(float(height), 6),
                              Count=int(count), Gene="intergenic", Gene_Start=None,
                              Gene_End=None, Strand=None))
+    if not rows:
+        return pd.DataFrame(columns=PEAKS_COLUMNS)
     return pd.DataFrame(rows).sort_values("Density", ascending=False)
 
 
@@ -73,8 +79,8 @@ def process_modification(label, args, modkit_file, largest_contig, genome_length
     mod = mod[mod["Contig"] == largest_contig].copy()
 
     print(f"\n--- {label} ---  sites: {len(mod)}")
-    if len(mod) < 50:
-        print("  Skipping — too few sites.")
+    if len(mod) < args.min_sites:
+        print(f"  Skipping — too few sites (< {args.min_sites}).")
         return None
 
     mod_positions = mod["Position"].values

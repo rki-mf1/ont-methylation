@@ -34,7 +34,7 @@ def main():
 
     # --- Load density ---
     df_density = pd.read_csv(args.density)
-    genome_length = df_density["Position"].max() + 10000
+    genome_length = df_density["Position"].max()
 
     # --- Build Circos plot ---
     circos = Circos(sectors={"1": genome_length})
@@ -44,13 +44,17 @@ def main():
     track_density = sector.add_track((45, 90))
     track_density.axis()
 
-    pos         = df_density["Position"].values
-    density     = df_density["Density_smooth"].values
-    avg_density = density.mean()
+    pos          = df_density["Position"].values
+    density      = df_density["Density_smooth"].values
+    avg_density  = density.mean()
+    d_min, d_max = density.min(), density.max()
+    pad  = (d_max - d_min) * 0.15 or 1e-9  # headroom so peaks/troughs don't touch the track boundary
+    vmin = d_min - pad
+    vmax = d_max + pad
 
-    track_density.fill_between(pos, density, y2=avg_density, color="#6A9EE8", alpha=1)
+    track_density.fill_between(pos, density, y2=avg_density, vmin=vmin, vmax=vmax, color="#6A9EE8", alpha=1)
     above = density > avg_density
-    track_density.fill_between(pos[above], density[above], y2=avg_density, color="#C0392B", alpha=1)
+    track_density.fill_between(pos[above], density[above], y2=avg_density, vmin=vmin, vmax=vmax, color="#C0392B", alpha=1)
 
     track_density.xticks_by_interval(
         interval=500_000,
