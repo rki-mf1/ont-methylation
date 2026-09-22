@@ -1,114 +1,101 @@
 #!/usr/bin/env nextflow
 nextflow.enable.dsl=2
 
-// terminal prints
-println " "
-println "\u001B[32mProfile: $workflow.profile\033[0m"
-println " "
-println "\033[2mCurrent User: $workflow.userName"
-println "Nextflow-version: $nextflow.version"
-println "Starting time: $nextflow.timestamp"
-println "Workdir location:"
-println "  $workflow.workDir\u001B[0m"
-println " "
-
-// error codes
-if (params.profile) { exit 1, "--profile is WRONG use -profile" }
-if ( !workflow.revision ) { 
-  println "\033[0;33mWARNING: It is recommended to use a stable release version via -r." 
-  println "Use 'nextflow info valegale/ONT_methylation' to check for available release versions.\033[0m\n"   // TODO
-}
-// help
-if (params.help) { exit 0, helpMSG() }
-
-
-// input channels conditioned on flow (main, annotation, dmr) 
-if (params.flow == 'main') {
-
-    if (!params.bam)   { error "❌ --bam is required for --flow main" }
-    if (!params.fasta) { error "❌ --fasta is required for --flow main" }
-
-    if (params.fasta && params.list) { fasta_input_ch = Channel
-        .fromPath( params.fasta, checkIfExists: true )
-        .splitCsv()
-        .map { row -> [row[0], file("${row[1]}", checkIfExists: true)] }
-    } else if (params.fasta) { fasta_input_ch = Channel
-        .fromPath( params.fasta, checkIfExists: true)
-        .map { file -> tuple(file.baseName, file) }
-    }
-
-    if (params.bam && params.list) { bam_input_ch = Channel
-        .fromPath( params.bam, checkIfExists: true )
-        .splitCsv()
-        .map { row -> [row[0], file("${row[1]}", checkIfExists: true)] }
-    } else if (params.bam) { bam_input_ch = Channel
-        .fromPath( params.bam, checkIfExists: true)
-        .map { file -> tuple(file.baseName, file) }
-    }
-
-    bins = Channel.empty()
-    if (params.meta) {
-        if (!params.bin_folder) { error "❌ --bin_folder must be provided when using --meta" }
-        bin_dir = file(params.bin_folder)
-        if (!bin_dir.isDirectory()) {
-            error "❌ --bin_folder does not exist or is not a directory: ${params.bin_folder}"
-        }
-        bin_files = bin_dir.listFiles()?.findAll { it.name ==~ /.*\.(fasta|fa)$/ } ?: []
-        if (bin_files.isEmpty()) {
-            error "❌ No bin FASTA files (*.fasta or *.fa) found in --bin_folder: ${params.bin_folder}. " +
-                  "Make sure the results from binning are organized in bin FASTA files and placed directly in this folder."
-        }
-        bins = Channel.fromPath("${params.bin_folder}/*.{fasta,fa}", checkIfExists: true)
-        fasta_input_ch.count().map { cnt ->
-            if (cnt != 1) error "Exactly one FASTA file must be provided when using --meta. Found: ${cnt}"
-        }
-        bam_input_ch.count().map { cnt ->
-            if (cnt != 1) error "Exactly one BAM file must be provided when using --meta. Found: ${cnt}"
-        }
-    }
-
-} else if (params.flow == 'annotation') {
-
-    if (!params.modkit_bed) { error "❌ --modkit_bed is required for --flow annotation" }
-    if (!params.fasta)      { error "❌ --fasta is required for --flow annotation" }
-    if (!params.gff3)       { error "❌ --gff3 is required for --flow annotation" }
-
-    fasta_input_ch = Channel
-        .fromPath(params.fasta, checkIfExists: true)
-        .map { file -> tuple(file.baseName, file) }
-
-    modkit_bed_input_ch = Channel
-        .fromPath(params.modkit_bed, checkIfExists: true)
-
-    gff3_input_ch = Channel
-        .fromPath(params.gff3, checkIfExists: true)
-
-} else if (params.flow == 'dmr') {
-
-    if (!params.bam)   { error "❌ --bam is required for --flow dmr" }
-    if (!params.fasta) { error "❌ --fasta is required for --flow dmr" }
-    if (!params.gff3)  { error "❌ --gff3 is required for --flow dmr" }
-    // dmr input channels WIP
-
-}
-
 include { MAIN_FLOW }       from './workflows/main_flow'
 include { ANNOTATION_FLOW } from './workflows/annotation_flow'
 
-params.flow = 'main'
-
 workflow {
+
+    println " "
+    println "\u001B[32mProfile: $workflow.profile\033[0m"
+    println " "
+    println "\033[2mCurrent User: $workflow.userName"
+    println "Nextflow-version: $nextflow.version"
+    println "Starting time: $nextflow.timestamp"
+    println "Workdir location:"
+    println "  $workflow.workDir\u001B[0m"
+    println " "
+
+    if (params.profile) { error "--profile is WRONG use -profile" }
+    if ( !workflow.revision ) {
+      println "\033[0;33mWARNING: It is recommended to use a stable release version via -r."
+      println "Use 'nextflow info valegale/ONT_methylation' to check for available release versions.\033[0m\n"   // TODO
+    }
+    // help
+    if (params.help) { helpMSG(); return }
+
+    // input channels conditioned on flow (main, annotation, dmr)
     if (params.flow == 'main') {
+
+        if (!params.bam)   { error "❌ --bam is required for --flow main" }
+        if (!params.fasta) { error "❌ --fasta is required for --flow main" }
+
+        def fasta_input_ch = params.list
+            ? Channel.fromPath( params.fasta, checkIfExists: true )
+                .splitCsv()
+                .map { row -> [row[0], file("${row[1]}", checkIfExists: true)] }
+            : Channel.fromPath( params.fasta, checkIfExists: true )
+                .map { f -> tuple(f.baseName, f) }
+
+        def bam_input_ch = params.list
+            ? Channel.fromPath( params.bam, checkIfExists: true )
+                .splitCsv()
+                .map { row -> [row[0], file("${row[1]}", checkIfExists: true)] }
+            : Channel.fromPath( params.bam, checkIfExists: true )
+                .map { f -> tuple(f.baseName, f) }
+
+        if (params.meta) {
+            if (!params.bin_folder) { error "❌ --bin_folder must be provided when using --meta" }
+            def bin_dir = file(params.bin_folder)
+            if (!bin_dir.isDirectory()) {
+                error "❌ --bin_folder does not exist or is not a directory: ${params.bin_folder}"
+            }
+            def bin_files = bin_dir.listFiles()?.findAll { it.name ==~ /.*\.(fasta|fa)$/ } ?: []
+            if (bin_files.isEmpty()) {
+                error "❌ No bin FASTA files (*.fasta or *.fa) found in --bin_folder: ${params.bin_folder}. " +
+                      "Make sure the results from binning are organized in bin FASTA files and placed directly in this folder."
+            }
+            fasta_input_ch.count().map { cnt ->
+                if (cnt != 1) error "Exactly one FASTA file must be provided when using --meta. Found: ${cnt}"
+            }
+            bam_input_ch.count().map { cnt ->
+                if (cnt != 1) error "Exactly one BAM file must be provided when using --meta. Found: ${cnt}"
+            }
+        }
+
+        def bins = params.meta
+            ? Channel.fromPath("${params.bin_folder}/*.{fasta,fa}", checkIfExists: true)
+            : Channel.empty()
+
         MAIN_FLOW(bam_input_ch, fasta_input_ch, bins)
+
     } else if (params.flow == 'annotation') {
+
+        if (!params.modkit_bed) { error "❌ --modkit_bed is required for --flow annotation" }
+        if (!params.fasta)      { error "❌ --fasta is required for --flow annotation" }
+        if (!params.gff3)       { error "❌ --gff3 is required for --flow annotation" }
+
+        def fasta_input_ch = Channel
+            .fromPath(params.fasta, checkIfExists: true)
+            .map { f -> tuple(f.baseName, f) }
+
+        def modkit_bed_input_ch = Channel
+            .fromPath(params.modkit_bed, checkIfExists: true)
+
+        def gff3_input_ch = Channel
+            .fromPath(params.gff3, checkIfExists: true)
+
         ANNOTATION_FLOW(
             fasta_input_ch,
             modkit_bed_input_ch,
             gff3_input_ch
         )
+
     } else if (params.flow == 'dmr') {
-        //work in progress
-        DMR_FLOW()
+
+        // dmr flow is work in progress
+        error "❌ --flow dmr is not yet implemented"
+
     } else {
         error "❌ Unknown --flow '${params.flow}'. Valid options: main, annotation, dmr"
     }
@@ -116,12 +103,12 @@ workflow {
 
 // --help
 def helpMSG() {
-    c_green = "\033[0;32m";
-    c_reset = "\033[0m";
-    c_yellow = "\033[0;33m";
-    c_blue = "\033[0;34m";
-    c_red = "\033[0;31m";
-    c_dim = "\033[2m";
+    def c_green = "\033[0;32m";
+    def c_reset = "\033[0m";
+    def c_yellow = "\033[0;33m";
+    def c_blue = "\033[0;34m";
+    def c_red = "\033[0;31m";
+    def c_dim = "\033[2m";
     log.info """
     ____________________________________________________________________________________________
 
