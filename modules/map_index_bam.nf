@@ -21,8 +21,8 @@ process bam2fastq {
 process zipfastq {
     // zip fastq file
     label 'minimap2'
-    publishDir  "${params.outdir}/${sample_id}", mode:'copy'
-        
+    publishDir  { "${params.outdir}/${sample_id}" }, mode:'copy'
+
     input:
     tuple val(sample_id), path(fastq_file)
 
@@ -42,7 +42,7 @@ process zipfastq {
 process minimap2 {
     label 'minimap2'
     // align with minimap2 
-    publishDir  "${params.outdir}/${sample_id}", mode:'copy'
+    publishDir  { "${params.outdir}/${sample_id}" }, mode:'copy'
 
     input:
     tuple val(sample_id), path(fastq_file), path(reference)
@@ -67,7 +67,7 @@ process minimap2 {
 
 process split_bam_by_bin {
     label 'minimap2'
-    publishDir "${params.outdir}/${sample_id}/bins/${bin_fa.baseName}", mode: 'copy'
+    publishDir { "${params.outdir}/${sample_id}/bins/${bin_fa.baseName}" }, mode: 'copy'
 
     input:
     tuple val(sample_id), path(bam_file), path(bam_index), path(reference), path(bin_fa)

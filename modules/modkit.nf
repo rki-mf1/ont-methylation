@@ -123,7 +123,7 @@ process modkit_find_motifs {
 
 process publish_results_meta {
     label 'publish'
-    publishDir "${params.outdir}/${sample_id}/bins/${reference_name}", mode: 'copy'
+    publishDir { "${params.outdir}/${sample_id}/bins/${reference_name}" }, mode: 'copy'
 
     input:
     tuple val(reference_name), val(sample_id), path(reference),
@@ -139,7 +139,7 @@ process publish_results_meta {
 
 process publish_results_motifs_meta {
     label 'publish'
-    publishDir "${params.outdir}/${sample_id}/bins/${reference_name}", mode: 'copy'
+    publishDir { "${params.outdir}/${sample_id}/bins/${reference_name}" }, mode: 'copy'
 
     input:
     tuple val(reference_name), val(sample_id), path(reference), 
@@ -155,7 +155,7 @@ process publish_results_motifs_meta {
 
 process publish_results {
     label 'publish'
-    publishDir "${params.outdir}/${sample_id}", mode: 'copy'
+    publishDir { "${params.outdir}/${sample_id}" }, mode: 'copy'
 
     input:
     tuple val(reference_name), val(sample_id), path(reference),
@@ -171,7 +171,7 @@ process publish_results {
 
 process publish_results_motifs {
     label 'publish'
-    publishDir "${params.outdir}/${sample_id}", mode: 'copy'
+    publishDir { "${params.outdir}/${sample_id}" }, mode: 'copy'
 
     input:
     tuple val(reference_name), val(sample_id), path(reference), 

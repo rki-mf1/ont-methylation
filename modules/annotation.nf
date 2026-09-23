@@ -1,7 +1,7 @@
 process methylation_density {
     label 'annotation'
-    publishDir "${params.outdir}/${sample_id}/annotation/density", mode: 'copy', pattern: "density_*.csv"
-    publishDir "${params.outdir}/${sample_id}/annotation/tables",   mode: 'copy', pattern: "peaks_*.csv"
+    publishDir { "${params.outdir}/${sample_id}/annotation/density" }, mode: 'copy', pattern: "density_*.csv"
+    publishDir { "${params.outdir}/${sample_id}/annotation/tables" },   mode: 'copy', pattern: "peaks_*.csv"
 
 
     input:
@@ -37,8 +37,8 @@ process methylation_density {
 
 process motif_density {
     label 'annotation'
-    publishDir "${params.outdir}/${sample_id}/annotation/density", mode: 'copy', pattern: "density_*.csv"
-    publishDir "${params.outdir}/${sample_id}/annotation/tables",   mode: 'copy', pattern: "peaks_*.csv"
+    publishDir { "${params.outdir}/${sample_id}/annotation/density" }, mode: 'copy', pattern: "density_*.csv"
+    publishDir { "${params.outdir}/${sample_id}/annotation/tables" },   mode: 'copy', pattern: "peaks_*.csv"
 
     input:
     tuple val(sample_id), path(fasta), path(gff3), path(motif_file)
@@ -71,7 +71,7 @@ process motif_density {
 
 process combine_peaks {
     label 'annotation'
-    publishDir "${params.outdir}/${sample_id}/annotation/tables", mode: 'copy'
+    publishDir { "${params.outdir}/${sample_id}/annotation/tables" }, mode: 'copy'
 
     input:
     tuple val(sample_id), path(meth_peaks_csvs), path(motif_peaks_csvs)
@@ -95,7 +95,7 @@ process combine_peaks {
 
 process circular_plot {
     label 'annotation'
-    publishDir "${params.outdir}/${sample_id}/annotation/plots", mode: 'copy'
+    publishDir { "${params.outdir}/${sample_id}/annotation/plots" }, mode: 'copy'
 
     input:
     tuple val(sample_id), val(modification), path(peaks_genic_csv), path(density_csv)
@@ -122,7 +122,7 @@ process circular_plot {
 
 process promoter_analysis {
     label 'annotation'
-    publishDir "${params.outdir}/${sample_id}/annotation/promoters", mode: 'copy'
+    publishDir { "${params.outdir}/${sample_id}/annotation/promoters" }, mode: 'copy'
 
     input:
     tuple val(sample_id), path(fasta), path(modkit_bed), path(gff3), path(motif_file)
