@@ -7,6 +7,10 @@ workflow ANNOTATION_FLOW {
         gff3_ch
 
     main:
+        if (!params.modkit_motifs) {
+            println "\033[0;33mNote: --modkit_motifs not provided — motif-based density and promoter analysis will be skipped. Include --modkit_motifs (from modkit motif search) to enable them.\033[0m"
+        }
+
         meth_input_ch = fasta_ch
             .combine(modkit_bed_ch)
             .combine(gff3_ch)
@@ -87,15 +91,14 @@ workflow ANNOTATION_FLOW {
         circular_plot(circular_ch)
 
         // promoter_analysis: requires both modkit_motifs and promoter_analysis flag
-        if (params.promoter_analysis) {
-            if (!params.modkit_motifs) {
-                error "ERROR: --promoter_analysis requires --modkit_motifs to be provided"
-            }
+        if (params.promoter_analysis && params.modkit_motifs) {
             promoter_input_ch = fasta_ch
                 .combine(modkit_bed_ch)
                 .combine(gff3_ch)
                 .combine(Channel.fromPath(params.modkit_motifs, checkIfExists: true))
             promoter_analysis(promoter_input_ch)
+        } else if (params.promoter_analysis && !params.modkit_motifs) {
+            println "\033[0;33mNote: --promoter_analysis was requested but --modkit_motifs is missing — skipping promoter analysis.\033[0m"
         }
 
 
