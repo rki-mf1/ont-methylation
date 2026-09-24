@@ -19,6 +19,29 @@ process modkit_pileup {
     """
 }
 
+process compress_index_modkit_bed {
+    label 'minimap2'
+    // bgzip-compress and tabix-index the modkit pileup bed: needed by `modkit dmr`, and usable directly
+    // by the annotation flow too (pandas reads .bed.gz transparently, no code changes needed there)
+
+    input:
+    tuple val(reference_name), val(sample_id), path(reference), path(bed_file)
+
+    output:
+    tuple val(reference_name), val(sample_id), path("${bed_file}.gz"), path("${bed_file}.gz.tbi")
+
+    script:
+    """
+    bgzip -c ${bed_file} > ${bed_file}.gz
+    tabix -p bed ${bed_file}.gz
+    """
+    stub:
+    """
+    touch ${bed_file}.gz
+    touch ${bed_file}.gz.tbi
+    """
+}
+
 process modkit_pileup_bigwigs {
     label 'modkit'
     // execute the modkit pileup command and convert to per-modification bigWig tracks using modkit's own tobigwig
@@ -127,10 +150,10 @@ process publish_results_meta {
 
     input:
     tuple val(reference_name), val(sample_id), path(reference),
-          path(bed_file), path(bigwigs_modkit), path(bigwigs_custom), path(modifications_tables), path(statistics)
+          path(bed_file), path(bed_gz), path(bed_gz_tbi), path(bigwigs_modkit), path(bigwigs_custom), path(modifications_tables), path(statistics)
 
     output:
-    tuple path(bed_file), path(bigwigs_modkit), path(bigwigs_custom), path(modifications_tables), path(statistics)
+    tuple path(bed_file), path(bed_gz), path(bed_gz_tbi), path(bigwigs_modkit), path(bigwigs_custom), path(modifications_tables), path(statistics)
 
     script:
     """
@@ -159,10 +182,10 @@ process publish_results {
 
     input:
     tuple val(reference_name), val(sample_id), path(reference),
-          path(bed_file), path(bigwigs_modkit), path(bigwigs_custom), path(modifications_tables), path(statistics)
+          path(bed_file), path(bed_gz), path(bed_gz_tbi), path(bigwigs_modkit), path(bigwigs_custom), path(modifications_tables), path(statistics)
 
     output:
-    tuple path(bed_file), path(bigwigs_modkit), path(bigwigs_custom), path(modifications_tables), path(statistics)
+    tuple path(bed_file), path(bed_gz), path(bed_gz_tbi), path(bigwigs_modkit), path(bigwigs_custom), path(modifications_tables), path(statistics)
 
     script:
     """
