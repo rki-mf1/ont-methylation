@@ -43,16 +43,23 @@ def save_filtered_tables(modkit_table, folder_tables, percent_cutoff, min_covera
 
 
 def create_methylation_tracks(modkit_table, folder_tracks, min_coverage):
-    # at positions covered on both strands, keep the higher-coverage strand only (mirrors modkit's own tobigwig merge rule)
+    # at positions covered on both strands, keep the strand with more confidently-classified
+    # (valid) reads -- NOT the strand with more total coverage. Total_coverage includes
+    # below-threshold/ambiguous reads, so a strand that is almost entirely ambiguous noise
+    # (e.g. 343 below-threshold reads, 1 real classified read) can otherwise outrank a strand
+    # carrying substantial real signal (e.g. 260 valid reads, clearly modified), simply by
+    # accumulating more junk. Valid_coverage only counts reads modkit actually classified
+    # (Modified + Unmodified + Other_mod), so a noise-dominated strand can no longer win a
+    # tiebreak it has no real evidence for.
     modifications = ["a", "m", "21839"]
     modification_names = {"a": "6mA", "m": "5mC", "21839": "4mC"}
 
     for modification in modifications:
         mod_table = modkit_table[
             (modkit_table.Modification == modification) & (modkit_table.Total_coverage >= min_coverage)
-        ][["Contig", "Position", "End", "Strand", "Percent_modified", "Total_coverage"]]
+        ][["Contig", "Position", "End", "Strand", "Percent_modified", "Total_coverage", "Valid_coverage"]]
 
-        mod_table = mod_table.sort_values("Total_coverage", ascending=False) \
+        mod_table = mod_table.sort_values("Valid_coverage", ascending=False) \
                               .drop_duplicates(subset=["Contig", "Position", "End"], keep="first")
 
         mod_table = mod_table.assign(
@@ -97,6 +104,8 @@ if __name__ == "__main__":
     
 
     results_table_path =  os.path.join(args.results_folder, "modifications_tables")
+    if not os.path.exists(results_table_path):
+        os.makedirs(results_table_path)
     save_filtered_tables(modkit_table, results_table_path, percent_cutoff, min_coverage)
 
     results_tracks_path = os.path.join(args.results_folder, "modification_tracks")
