@@ -29,6 +29,14 @@ def load_peak_files(filepaths, source_type):
             continue
         df["Signal"]      = label
         df["Source_type"] = source_type
+        # intergenic rows all share Gene="intergenic", Gene_Start/End/Strand=None, so
+        # without disambiguation every intergenic peak in the genome collapses into one
+        # row on pivot, losing all positional information. Fold Peak_Position into the
+        # label so each intergenic peak stays distinct.
+        is_intergenic = df["Gene"] == "intergenic"
+        df.loc[is_intergenic, "Gene"] = (
+            "intergenic_" + df.loc[is_intergenic, "Peak_Position"].astype(str)
+        )
         dfs.append(df)
         print(f"  Loaded {len(df)} rows from {os.path.basename(filepath)}")
     return dfs
@@ -47,6 +55,12 @@ def main():
     os.makedirs(args.outdir, exist_ok=True)
 
     combined = pd.concat(all_dfs, ignore_index=True)
+
+    # pivot_table (via its internal groupby) silently drops any row with NaN in an index
+    # column -- Gene_Start/Gene_End/Strand are NaN for every intergenic row, so without
+    # this they'd vanish from the output entirely rather than just losing their position.
+    combined[INDEX_COLS] = combined[INDEX_COLS].fillna("NA")
+
     print(f"\nTotal rows: {len(combined)}  |  Unique genes: {combined['Gene'].nunique()}")
 
     # Long format
