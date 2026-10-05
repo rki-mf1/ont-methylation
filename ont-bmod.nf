@@ -3,6 +3,7 @@ nextflow.enable.dsl=2
 
 include { MAIN_FLOW }       from './workflows/main_flow'
 include { ANNOTATION_FLOW } from './workflows/annotation_flow'
+include { DMR_FLOW }        from './workflows/dmr_flow'
 
 workflow {
 
@@ -93,8 +94,22 @@ workflow {
 
     } else if (params.flow == 'dmr') {
 
-        // dmr flow is work in progress
-        error "❌ --flow dmr is not yet implemented"
+        if (!params.fasta) { error "❌ --fasta is required for --flow dmr (a single reference every sample must share)" }
+        if (!params.bam && !params.modkit_bed) { error "❌ --flow dmr needs either --bam (BAMs to map+pileup) or --modkit_bed (already bgzip/tabix'd pileup beds)" }
+        if (params.bam && params.modkit_bed) { error "❌ --flow dmr: provide either --bam or --modkit_bed, not both" }
+
+        def input_is_bam = params.bam as boolean
+
+        def fasta_ch = Channel.value(file(params.fasta, checkIfExists: true))
+
+        def sample_input_ch = params.list
+            ? Channel.fromPath(input_is_bam ? params.bam : params.modkit_bed, checkIfExists: true)
+                .splitCsv()
+                .map { row -> [row[0], file("${row[1]}", checkIfExists: true)] }
+            : Channel.fromPath(input_is_bam ? params.bam : params.modkit_bed, checkIfExists: true)
+                .map { f -> tuple(f.baseName, f) }
+
+        DMR_FLOW(sample_input_ch, fasta_ch, input_is_bam)
 
     } else {
         error "❌ Unknown --flow '${params.flow}'. Valid options: main, annotation, dmr"

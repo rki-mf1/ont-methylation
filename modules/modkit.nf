@@ -153,7 +153,7 @@ process publish_results_meta {
           path(bed_file), path(bed_gz), path(bed_gz_tbi), path(bigwigs_modkit), path(bigwigs_custom), path(modifications_tables), path(statistics)
 
     output:
-    tuple path(bed_file), path(bed_gz), path(bed_gz_tbi), path(bigwigs_modkit), path(bigwigs_custom), path(modifications_tables), path(statistics)
+    tuple path(bed_gz), path(bed_gz_tbi), path(bigwigs_modkit), path(bigwigs_custom), path(modifications_tables), path(statistics)
 
     script:
     """
@@ -185,7 +185,7 @@ process publish_results {
           path(bed_file), path(bed_gz), path(bed_gz_tbi), path(bigwigs_modkit), path(bigwigs_custom), path(modifications_tables), path(statistics)
 
     output:
-    tuple path(bed_file), path(bed_gz), path(bed_gz_tbi), path(bigwigs_modkit), path(bigwigs_custom), path(modifications_tables), path(statistics)
+    tuple path(bed_gz), path(bed_gz_tbi), path(bigwigs_modkit), path(bigwigs_custom), path(modifications_tables), path(statistics)
 
     script:
     """
