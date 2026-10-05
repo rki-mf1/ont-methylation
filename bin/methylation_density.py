@@ -29,6 +29,7 @@ def parse_args():
     p.add_argument("--outdir",                     required=True)
     p.add_argument("--modifications",              default="6mA,5mC,4mC")
     p.add_argument("--percent_modified_threshold", type=float, default=0.5)
+    p.add_argument("--min_coverage",               type=int,   default=10)
     p.add_argument("--top_n",                      type=int,   default=30)
     p.add_argument("--window_size",                type=int,   default=500)
     p.add_argument("--step_size",                  type=int,   default=10)
@@ -74,7 +75,7 @@ def process_modification(label, args, modkit_file, largest_contig, genome_length
         print(f"WARNING: unknown modification '{label}', skipping.")
         return None
 
-    mod = read_modkit(modkit_file, args.percent_modified_threshold, mod_code)
+    mod = read_modkit(modkit_file, args.percent_modified_threshold, mod_code, args.min_coverage)
     mod["Contig"] = mod["Contig"].astype(str).str.strip()
     mod = mod[mod["Contig"] == largest_contig].copy()
 

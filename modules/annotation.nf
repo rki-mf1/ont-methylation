@@ -26,7 +26,8 @@ process methylation_density {
         --step_size                  ${params.step_size} \
         --smoothing_window           ${params.smoothing_window} \
         --enrichment_threshold       ${params.enrichment_threshold} \
-        --min_sites                  ${params.min_sites_annotation}
+        --min_sites                  ${params.min_sites_annotation} \
+        --min_coverage               ${params.min_coverage_annotation}
     """
     stub:
     """
@@ -140,7 +141,8 @@ process promoter_analysis {
         --sample                     ${sample_id}  \
         --outdir                     . \
         --promoter_window            ${params.promoter_window} \
-        --percent_modified_promoter ${params.percent_modified_threshold_promoter}
+        --percent_modified_promoter ${params.percent_modified_threshold_promoter} \
+        --min_coverage               ${params.min_coverage_annotation}
     """
     stub:
     """

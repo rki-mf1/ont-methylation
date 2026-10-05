@@ -53,8 +53,8 @@ def parse_gff3_gene_names(gff3_file):
 
     return all_regions
 
-def read_modkit(modkit_output, percent_modified_threshold, modification):
-    """Parse the output of Modkit and save it in a pd dataframe. 
+def read_modkit(modkit_output, percent_modified_threshold, modification, min_coverage):
+    """Parse the output of Modkit and save it in a pd dataframe.
     """
 
     d = pd.read_csv(modkit_output, sep="\t", header=None)
@@ -96,6 +96,9 @@ def read_modkit(modkit_output, percent_modified_threshold, modification):
 
     d["SNP_Position_Strand"] = d["SNP_Position"] + "-" + d["Strand"]
 
-    d = d[(d.Percent_modified >= percent_modified_threshold) & (d.Modification == modification) & (d.Total_coverage > 0)].drop("End", axis=1) 
+    # Total_coverage > 0 alone lets a single read decide a site's Percent_modified (e.g.
+    # coverage=1, modified=1 -> 100% modified) -- min_coverage keeps such statistically
+    # meaningless low-coverage calls out of peak/density/promoter counts.
+    d = d[(d.Percent_modified >= percent_modified_threshold) & (d.Modification == modification) & (d.Total_coverage >= min_coverage)].drop("End", axis=1)
 
     return d

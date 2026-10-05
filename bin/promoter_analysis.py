@@ -19,6 +19,7 @@ def parse_args():
     parser.add_argument("--outdir",                      required=True)
     parser.add_argument("--promoter_window",             type=int,   default=250)
     parser.add_argument("--percent_modified_promoter",  type=float, default=0.3)
+    parser.add_argument("--min_coverage",               type=int,   default=10)
     return parser.parse_args()
 
 
@@ -80,7 +81,7 @@ def main():
     all_positions = {}
     for mod_code in motif_df_dedup["mod_code"].unique():
         print(f"\nLoading modkit data for mod_code: {mod_code}")
-        mod = read_modkit(args.modkit_bed, 0, mod_code)
+        mod = read_modkit(args.modkit_bed, 0, mod_code, args.min_coverage)
         mod["Contig"] = mod["Contig"].astype(str).str.strip()
         mod = mod[mod["Contig"] == largest_contig].copy()
         all_positions[mod_code] = (
