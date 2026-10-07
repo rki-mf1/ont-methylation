@@ -25,7 +25,7 @@ def parse_args():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--labels", nargs="+", required=True, help="One label per comparison, same order as --tsvs")
     p.add_argument("--tsvs", nargs="+", required=True, help="filter_dmr.py output TSVs, same order as --labels")
-    p.add_argument("--base", required=True, help="Modification base these comparisons were run for (e.g. A or C)")
+    p.add_argument("--base", required=True, help="Modification these comparisons were run for (e.g. 6mA, 5mC, 4mC)")
     p.add_argument("--outdir", default=".", help="Output directory")
     return p.parse_args()
 
@@ -88,7 +88,11 @@ def main():
         members = [label for label, s in site_sets.items() if site in s]
         rows.append({"chrom": site[0], "start": site[1],
                      "n_comparisons": len(members), "comparisons": ",".join(members)})
-    summary = pd.DataFrame(rows).sort_values(["n_comparisons", "chrom", "start"], ascending=[False, True, True])
+    # pd.DataFrame([]) (no DMR sites in any comparison, e.g. a rare modification like 4mC
+    # under the strict coverage mode) has no columns at all -- explicit columns keep
+    # sort_values/value_counts below working on an empty result instead of KeyError'ing.
+    summary = pd.DataFrame(rows, columns=["chrom", "start", "n_comparisons", "comparisons"]) \
+        .sort_values(["n_comparisons", "chrom", "start"], ascending=[False, True, True])
     summary_path = os.path.join(args.outdir, f"dmr_overlap_{args.base}_summary.tsv")
     summary.to_csv(summary_path, sep="\t", index=False)
     print(f"Overlap summary -> {summary_path}  ({len(summary)} unique sites)")
@@ -101,7 +105,7 @@ def main():
         sizes = (len(a - b), len(b - a), len(a & b))
         fig, ax = plt.subplots(figsize=(6, 6))
         draw_venn2(ax, sizes, args.labels)
-        ax.set_title(f"6mA/5mC DMR site overlap ({args.base})")
+        ax.set_title(f"DMR site overlap ({args.base})")
         plt.tight_layout()
         plt.savefig(plot_path, dpi=150, bbox_inches="tight")
     elif n == 3:
@@ -111,7 +115,7 @@ def main():
         abc = len(a & b & c)
         fig, ax = plt.subplots(figsize=(6, 6))
         draw_venn3(ax, (only_a, only_b, only_c, ab, ac, bc, abc), args.labels)
-        ax.set_title(f"6mA/5mC DMR site overlap ({args.base})")
+        ax.set_title(f"DMR site overlap ({args.base})")
         plt.tight_layout()
         plt.savefig(plot_path, dpi=150, bbox_inches="tight")
     else:

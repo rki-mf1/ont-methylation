@@ -1,3 +1,12 @@
+// modkit dmr pair's --base C pools 5mC and 4mC together (its own a_counts/b_counts columns
+// show calls split by code, e.g. "m:316,21839:0" at a single site -- a "C" DMR result can be
+// driven by either or both). --single-code narrows a --base run down to one modification code
+// in isolation, which is how we get real 5mC-vs-4mC separation -- it's a filter on top of
+// --base, not a replacement for it ("Error! need to specify at least 1 modified base" if
+// --base is left out, confirmed against modkit 0.6.3 directly).
+MOD_CODE = ["6mA": "a", "5mC": "m", "4mC": "21839"]
+PRIMARY_BASE = ["6mA": "A", "5mC": "C", "4mC": "C"]
+
 process verify_same_reference {
     label 'minimap2'
     // when the user hands us already-compressed pileup beds (instead of BAMs), we skip
@@ -78,100 +87,121 @@ process compress_index_reclassified {
 
 process dmr_pair {
     label 'modkit'
-    // pairwise, single-site DMR comparison for one modification base between two samples
+    // pairwise, single-site DMR comparison for one modification code between two samples
 
     input:
     tuple val(sample_a), path(bed_a, stageAs: "a.bed.gz"), path(tbi_a, stageAs: "a.bed.gz.tbi"),
           val(sample_b), path(bed_b, stageAs: "b.bed.gz"), path(tbi_b, stageAs: "b.bed.gz.tbi"),
-          val(venn_label), val(base), val(coverage_mode), path(reference)
+          val(venn_label), val(modification), val(coverage_mode), path(reference)
 
     output:
-    tuple val(sample_a), val(sample_b), val(base), val(venn_label), val(coverage_mode),
-          path("dmr_${sample_a}_${sample_b}_${base}_${coverage_mode}.bed")
+    tuple val(sample_a), val(sample_b), val(modification), val(venn_label), val(coverage_mode),
+          path("dmr_${sample_a}_${sample_b}_${modification}_${coverage_mode}.bed")
 
     script:
+    def mod_code = MOD_CODE[modification]
+    def primary_base = PRIMARY_BASE[modification]
     """
     modkit dmr pair \
         -a ${bed_a} \
         -b ${bed_b} \
-        -o dmr_${sample_a}_${sample_b}_${base}_${coverage_mode}.bed \
+        -o dmr_${sample_a}_${sample_b}_${modification}_${coverage_mode}.bed \
         --ref ${reference} \
-        --base ${base} \
+        --base ${primary_base} \
+        --single-code ${mod_code} \
         -t ${task.cpus} \
-        --log-filepath dmr_${sample_a}_${sample_b}_${base}_${coverage_mode}.log
+        --log-filepath dmr_${sample_a}_${sample_b}_${modification}_${coverage_mode}.log
     """
     stub:
     """
-    touch dmr_${sample_a}_${sample_b}_${base}_${coverage_mode}.bed
+    touch dmr_${sample_a}_${sample_b}_${modification}_${coverage_mode}.bed
     """
 }
 
 process filter_dmr {
     label 'biopython'
-    // the raw dmr_pair bed is 400MB+ per comparison on a real genome -- only publish the
-    // small filtered table, the raw file just passes through for volcano_plot/annotate_dmr
-    publishDir { "${params.outdir}/dmr/${sample_a}_vs_${sample_b}/${coverage_mode}" }, mode: 'copy', pattern: "*_filtered.tsv"
+    // this IS the DMR sites table (modkit dmr pair's raw output is every modifiable
+    // position genome-wide, mostly uninteresting -- this keeps only the ones that pass
+    // coverage/p-value/effect-size thresholds). When --gff3 is given, annotate_dmr adds
+    // gene names on top of this same table and that becomes the one published "sites"
+    // table instead, so this publish only fires as the fallback when there's no gff3.
+    // a table that's just a header and zero rows (e.g. a rare modification like 4mC under
+    // the strict coverage mode routinely has nothing survive filtering) isn't published --
+    // checked here in bash, where paths resolve against the task's own work dir, rather
+    // than in a publishDir saveAs closure, which resolves file() against the pipeline's
+    // launch directory instead and crashes trying to read a file that isn't there.
+    publishDir { "${params.outdir}/dmr_analysis/dmr_sites/tables/${coverage_mode}" }, mode: 'copy', pattern: "${sample_a}_vs_${sample_b}_${modification}_${coverage_mode}.tsv", enabled: !params.gff3
 
     input:
-    tuple val(sample_a), val(sample_b), val(base), val(venn_label), val(coverage_mode), path(raw_bed)
+    tuple val(sample_a), val(sample_b), val(modification), val(venn_label), val(coverage_mode), path(raw_bed)
 
     output:
-    tuple val(sample_a), val(sample_b), val(base), val(venn_label), val(coverage_mode), path(raw_bed),
-          path("dmr_${sample_a}_${sample_b}_${base}_${coverage_mode}_filtered.tsv")
+    tuple val(sample_a), val(sample_b), val(modification), val(venn_label), val(coverage_mode), path(raw_bed),
+          path("dmr_${sample_a}_${sample_b}_${modification}_${coverage_mode}_filtered.tsv"), emit: dmr
+    path("${sample_a}_vs_${sample_b}_${modification}_${coverage_mode}.tsv"), optional: true, emit: published
 
     script:
     def score_arg = params.dmr_min_score ? "--min-score ${params.dmr_min_score}" : ""
     """
-    filter_dmr.py ${raw_bed} dmr_${sample_a}_${sample_b}_${base}_${coverage_mode}_filtered.tsv \
+    filter_dmr.py ${raw_bed} dmr_${sample_a}_${sample_b}_${modification}_${coverage_mode}_filtered.tsv \
         --min-coverage ${params.dmr_min_coverage} \
         --max-pvalue ${params.dmr_max_pvalue} \
         --min-effect ${params.dmr_min_effect} \
         ${score_arg}
+    n_lines=\$(wc -l < dmr_${sample_a}_${sample_b}_${modification}_${coverage_mode}_filtered.tsv)
+    if [ "\$n_lines" -gt 1 ]; then
+        cp dmr_${sample_a}_${sample_b}_${modification}_${coverage_mode}_filtered.tsv ${sample_a}_vs_${sample_b}_${modification}_${coverage_mode}.tsv
+    fi
     """
     stub:
     """
-    touch dmr_${sample_a}_${sample_b}_${base}_${coverage_mode}_filtered.tsv
+    touch dmr_${sample_a}_${sample_b}_${modification}_${coverage_mode}_filtered.tsv
     """
 }
 
 process volcano_plot {
     label 'annotation'
-    publishDir { "${params.outdir}/dmr/${sample_a}_vs_${sample_b}/${coverage_mode}" }, mode: 'copy'
+    publishDir { "${params.outdir}/dmr_analysis/dmr_sites/plots/${coverage_mode}" }, mode: 'copy'
 
     input:
-    tuple val(sample_a), val(sample_b), val(base), val(venn_label), val(coverage_mode), path(raw_bed), path(filtered_tsv)
+    tuple val(sample_a), val(sample_b), val(modification), val(venn_label), val(coverage_mode), path(raw_bed), path(filtered_tsv)
 
     output:
-    path("dmr_${sample_a}_${sample_b}_${base}_${coverage_mode}_volcano.png")
+    path("dmr_${sample_a}_${sample_b}_${modification}_${coverage_mode}_volcano.png")
 
     script:
     """
     dmr_volcano_plot.py \
         --raw ${raw_bed} \
         --filtered ${filtered_tsv} \
-        --output dmr_${sample_a}_${sample_b}_${base}_${coverage_mode}_volcano.png \
-        --title "${sample_a} vs ${sample_b} (${base}, ${coverage_mode})" \
+        --output dmr_${sample_a}_${sample_b}_${modification}_${coverage_mode}_volcano.png \
+        --title "${sample_a} vs ${sample_b} (${modification}, ${coverage_mode})" \
         --min-coverage ${params.dmr_min_coverage} \
         --min-effect ${params.dmr_min_effect}
     """
     stub:
     """
-    touch dmr_${sample_a}_${sample_b}_${base}_${coverage_mode}_volcano.png
+    touch dmr_${sample_a}_${sample_b}_${modification}_${coverage_mode}_volcano.png
     """
 }
 
 process annotate_dmr {
     label 'annotation'
-    publishDir { "${params.outdir}/dmr/${sample_a}_vs_${sample_b}/${coverage_mode}" }, mode: 'copy'
+    // the sites table: filtered DMR sites (see filter_dmr) with gene annotation added --
+    // this IS the DMR results, not an intermediate -- one row per site (one per overlapping
+    // gene for genic sites, which already includes intergenic sites tagged as such, so
+    // there's no separate intergenic file to also look at).
+    // see filter_dmr for why emptiness is checked in bash rather than a publishDir saveAs
+    publishDir { "${params.outdir}/dmr_analysis/dmr_sites/tables/${coverage_mode}" }, mode: 'copy', pattern: "${sample_a}_vs_${sample_b}_${modification}_${coverage_mode}.tsv"
 
     input:
-    tuple val(sample_a), val(sample_b), val(base), val(venn_label), val(coverage_mode), path(raw_bed), path(filtered_tsv), path(reference), path(gff3)
+    tuple val(sample_a), val(sample_b), val(modification), val(venn_label), val(coverage_mode), path(raw_bed), path(filtered_tsv), path(reference), path(gff3)
 
     output:
-    tuple val(sample_a), val(sample_b), val(base), val(venn_label), val(coverage_mode),
-          path("dmr_${sample_a}_${sample_b}_${base}_${coverage_mode}_annotated.tsv"),
-          path("dmr_${sample_a}_${sample_b}_${base}_${coverage_mode}_annotated_intergenic.tsv"),
-          path("dmr_${sample_a}_${sample_b}_${base}_${coverage_mode}_meme.fasta")
+    tuple val(sample_a), val(sample_b), val(modification), val(venn_label), val(coverage_mode),
+          path("annotated_${sample_a}_${sample_b}_${modification}_${coverage_mode}.tsv"),
+          path("dmr_${sample_a}_${sample_b}_${modification}_${coverage_mode}_meme.fasta"), emit: annotated
+    path("${sample_a}_vs_${sample_b}_${modification}_${coverage_mode}.tsv"), optional: true, emit: published
 
     script:
     """
@@ -179,49 +209,62 @@ process annotate_dmr {
         --dmr ${filtered_tsv} \
         --gff3 ${gff3} \
         --fasta ${reference} \
-        --output dmr_${sample_a}_${sample_b}_${base}_${coverage_mode}_annotated.tsv \
-        --meme dmr_${sample_a}_${sample_b}_${base}_${coverage_mode}_meme.fasta \
-        --window 50
+        --output annotated_${sample_a}_${sample_b}_${modification}_${coverage_mode}.tsv \
+        --meme dmr_${sample_a}_${sample_b}_${modification}_${coverage_mode}_meme.fasta \
+        --window 25
+    n_lines=\$(wc -l < annotated_${sample_a}_${sample_b}_${modification}_${coverage_mode}.tsv)
+    if [ "\$n_lines" -gt 1 ]; then
+        cp annotated_${sample_a}_${sample_b}_${modification}_${coverage_mode}.tsv ${sample_a}_vs_${sample_b}_${modification}_${coverage_mode}.tsv
+    fi
     """
     stub:
     """
-    touch dmr_${sample_a}_${sample_b}_${base}_${coverage_mode}_annotated.tsv
-    touch dmr_${sample_a}_${sample_b}_${base}_${coverage_mode}_annotated_intergenic.tsv
-    touch dmr_${sample_a}_${sample_b}_${base}_${coverage_mode}_meme.fasta
+    touch annotated_${sample_a}_${sample_b}_${modification}_${coverage_mode}.tsv
+    touch dmr_${sample_a}_${sample_b}_${modification}_${coverage_mode}_meme.fasta
     """
 }
 
 process combine_dmr_results {
     label 'annotation'
-    publishDir { "${params.outdir}/dmr/combined/${coverage_mode}" }, mode: 'copy'
+    // see filter_dmr for why emptiness is checked in bash rather than a publishDir saveAs.
+    // nothing downstream in DMR_FLOW consumes these three files (they're pure publish
+    // outputs), so it's safe to just not create them at all when there's nothing to show.
+    publishDir { "${params.outdir}/dmr_analysis/dmr_sites/tables/${coverage_mode}/combined" }, mode: 'copy', pattern: "*.tsv"
+    publishDir { "${params.outdir}/dmr_analysis/dmr_sites/plots/${coverage_mode}/combined" }, mode: 'copy', pattern: "*.png"
 
     input:
-    tuple val(base), val(coverage_mode), val(labels), path(filtered_tsvs)
+    tuple val(modification), val(coverage_mode), val(labels), path(filtered_tsvs)
 
     output:
-    path("dmr_combined_${base}_${coverage_mode}.tsv")
-    path("dmr_overlap_${base}_${coverage_mode}_summary.tsv")
-    path("dmr_overlap_${base}_${coverage_mode}.png")
+    path("dmr_combined_${modification}_${coverage_mode}.tsv"), optional: true
+    path("dmr_overlap_${modification}_${coverage_mode}_summary.tsv"), optional: true
+    path("dmr_overlap_${modification}_${coverage_mode}.png"), optional: true
 
     script:
     """
     combine_dmr_results.py \
         --labels ${labels.join(' ')} \
         --tsvs ${filtered_tsvs} \
-        --base ${base}_${coverage_mode} \
+        --base ${modification}_${coverage_mode} \
         --outdir .
+    n_lines=\$(wc -l < dmr_combined_${modification}_${coverage_mode}.tsv)
+    if [ "\$n_lines" -le 1 ]; then
+        rm -f dmr_combined_${modification}_${coverage_mode}.tsv \
+              dmr_overlap_${modification}_${coverage_mode}_summary.tsv \
+              dmr_overlap_${modification}_${coverage_mode}.png
+    fi
     """
     stub:
     """
-    touch dmr_combined_${base}_${coverage_mode}.tsv
-    touch dmr_overlap_${base}_${coverage_mode}_summary.tsv
-    touch dmr_overlap_${base}_${coverage_mode}.png
+    touch dmr_combined_${modification}_${coverage_mode}.tsv
+    touch dmr_overlap_${modification}_${coverage_mode}_summary.tsv
+    touch dmr_overlap_${modification}_${coverage_mode}.png
     """
 }
 
 process rank_dmr_genes {
     label 'biopython'
-    publishDir { "${params.outdir}/dmr/combined/${coverage_mode}" }, mode: 'copy'
+    publishDir { "${params.outdir}/dmr_analysis/dmr_sites/tables/${coverage_mode}/combined" }, mode: 'copy'
     // which genes carry the most differential methylation, across every comparison and
     // modification base -- ranked by number of distinct DMR sites they contain.
 
@@ -245,7 +288,6 @@ process rank_dmr_genes {
 
 process discover_motifs {
     label 'meme'
-    publishDir { "${params.outdir}/dmr/${sample_a}_vs_${sample_b}" }, mode: 'copy'
     // de novo motif discovery (streme, from the MEME Suite) on the sequence context around
     // this comparison's DMR sites, one run per comparison -- kept separate rather than pooled
     // across comparisons, since different comparisons can be driven by different underlying
@@ -258,36 +300,50 @@ process discover_motifs {
     // annotate_dmr.py's get_sequence_context() always puts the actual DMR base at the exact
     // center of every sequence, so we reward motifs that consistently occur there rather than
     // just "over-represented anywhere in the window vs. a shuffled background".
+    //
+    // streme's own report (HTML/XML/txt) is noisy to read directly, so the clean
+    // summarize_streme_motifs.py table is the main result -- the full streme run output is
+    // still published too, just kept out of the way in its own "streme_raw" subfolder so it
+    // doesn't clutter the clean per-comparison motif tables.
+    // emptiness checked in bash, see filter_dmr; streme_raw is always published regardless
+    // (it's the full streme report, kept out of the way for anyone who wants to dig in)
+    publishDir { "${params.outdir}/dmr_analysis/motifs" }, mode: 'copy', pattern: "${sample_a}_vs_${sample_b}_${modification}_motifs.tsv"
+    publishDir { "${params.outdir}/dmr_analysis/motifs/streme_raw" }, mode: 'copy', pattern: "streme_${sample_a}_${sample_b}_${modification}"
 
     input:
-    tuple val(sample_a), val(sample_b), val(base), path(meme_fasta)
+    tuple val(sample_a), val(sample_b), val(modification), path(meme_fasta)
 
     output:
-    tuple val(sample_a), val(sample_b), val(base), path("streme_${sample_a}_${sample_b}_${base}")
+    tuple val(sample_a), val(sample_b), val(modification),
+          path("streme_${sample_a}_${sample_b}_${modification}")
+    path("${sample_a}_vs_${sample_b}_${modification}_motifs.tsv"), optional: true
 
     script:
     """
     n_sites=\$(grep -c "^>" ${meme_fasta} || true)
     if [ "\$n_sites" -lt ${params.dmr_motif_min_sites} ]; then
-        mkdir -p streme_${sample_a}_${sample_b}_${base}
-        echo "Skipped motif discovery for ${sample_a} vs ${sample_b} (${base}): only \$n_sites DMR site sequence(s), need >= ${params.dmr_motif_min_sites} (--dmr_motif_min_sites)." > streme_${sample_a}_${sample_b}_${base}/SKIPPED.txt
+        mkdir -p streme_${sample_a}_${sample_b}_${modification}
+        echo "Skipped motif discovery for ${sample_a} vs ${sample_b} (${modification}): only \$n_sites DMR site sequence(s), need >= ${params.dmr_motif_min_sites} (--dmr_motif_min_sites)." > streme_${sample_a}_${sample_b}_${modification}/SKIPPED.txt
     else
         streme --p ${meme_fasta} \
             --dna \
             --objfun cd \
             --minw ${params.dmr_motif_minw} \
             --maxw ${params.dmr_motif_maxw} \
-            --oc streme_${sample_a}_${sample_b}_${base}
+            --oc streme_${sample_a}_${sample_b}_${modification}
         summarize_streme_motifs.py \
-            --xml streme_${sample_a}_${sample_b}_${base}/streme.xml \
-            --output streme_${sample_a}_${sample_b}_${base}/motifs_summary.tsv
+            --xml streme_${sample_a}_${sample_b}_${modification}/streme.xml \
+            --output ${sample_a}_vs_${sample_b}_${modification}_motifs.tsv
+        n_lines=\$(wc -l < ${sample_a}_vs_${sample_b}_${modification}_motifs.tsv)
+        if [ "\$n_lines" -le 1 ]; then
+            rm -f ${sample_a}_vs_${sample_b}_${modification}_motifs.tsv
+        fi
     fi
     """
     stub:
     """
-    mkdir -p streme_${sample_a}_${sample_b}_${base}
-    touch streme_${sample_a}_${sample_b}_${base}/streme.txt
-    touch streme_${sample_a}_${sample_b}_${base}/motifs_summary.tsv
+    mkdir -p streme_${sample_a}_${sample_b}_${modification}
+    touch ${sample_a}_vs_${sample_b}_${modification}_motifs.tsv
     """
 }
 

@@ -67,7 +67,7 @@ workflow DMR_FLOW {
         // "valid" feeds de novo motif discovery (see below).
         bed_gz_strict_ch = compress_index_reclassified(reclassify_coverage(bed_gz_ch))
 
-        bases_ch = Channel.fromList(params.dmr_bases.split(",").collect { it.trim() })
+        modifications_ch = Channel.fromList(params.dmr_modifications.split(",").collect { it.trim() })
 
         // DSL2 forbids calling the same process twice in one workflow scope, so rather than
         // running dmr_pair/filter_dmr/... once per coverage mode, tag every sample with its
@@ -84,12 +84,12 @@ workflow DMR_FLOW {
             .map { mode, a, b, venn_label -> tuple(a[0], a[1], a[2], b[0], b[1], b[2], venn_label, mode) }
 
         dmr_raw_ch = dmr_pair(
-            pairs_ch.combine(bases_ch)
-                .map { sample_a, bed_a, tbi_a, sample_b, bed_b, tbi_b, venn_label, mode, base ->
-                    tuple(sample_a, bed_a, tbi_a, sample_b, bed_b, tbi_b, venn_label, base, mode) }
+            pairs_ch.combine(modifications_ch)
+                .map { sample_a, bed_a, tbi_a, sample_b, bed_b, tbi_b, venn_label, mode, modification ->
+                    tuple(sample_a, bed_a, tbi_a, sample_b, bed_b, tbi_b, venn_label, modification, mode) }
                 .combine(fasta_ch)
         )
-        dmr_filtered_ch = filter_dmr(dmr_raw_ch)
+        dmr_filtered_ch = filter_dmr(dmr_raw_ch).dmr
 
         volcano_plot(dmr_filtered_ch)
 
@@ -97,31 +97,31 @@ workflow DMR_FLOW {
             println "\033[0;33mNote: --gff3 not provided -- DMR sites will not be annotated with gene names, de novo motif discovery and gene ranking (which both need that step's output) will be skipped.\033[0m"
         } else {
             gff3_ch = Channel.value(file(params.gff3, checkIfExists: true))
-            annotated_ch = annotate_dmr(dmr_filtered_ch.combine(fasta_ch).combine(gff3_ch))
+            annotated_ch = annotate_dmr(dmr_filtered_ch.combine(fasta_ch).combine(gff3_ch)).annotated
 
             // de novo motif discovery only makes sense on the "valid" (more sensitive) site
             // set -- it's an exploratory step looking for candidate motifs, not a confirmatory
             // one, and running it twice on largely-overlapping/subset data wastes a genuinely
             // slow step for no extra information.
             motif_input_ch = annotated_ch
-                .filter { sample_a, sample_b, base, venn_label, coverage_mode, annotated_tsv, intergenic_tsv, meme_fasta -> coverage_mode == "valid" }
-                .map { sample_a, sample_b, base, venn_label, coverage_mode, annotated_tsv, intergenic_tsv, meme_fasta -> tuple(sample_a, sample_b, base, meme_fasta) }
+                .filter { sample_a, sample_b, modification, venn_label, coverage_mode, annotated_tsv, meme_fasta -> coverage_mode == "valid" }
+                .map { sample_a, sample_b, modification, venn_label, coverage_mode, annotated_tsv, meme_fasta -> tuple(sample_a, sample_b, modification, meme_fasta) }
 
             discover_motifs(motif_input_ch)
 
             // gene ranking runs per coverage mode, so you can compare the "strict" ranking
             // against the full "valid" one the same way we did by hand earlier.
             gene_rank_input_ch = annotated_ch
-                .map { sample_a, sample_b, base, venn_label, coverage_mode, annotated_tsv, intergenic_tsv, meme_fasta -> tuple(coverage_mode, annotated_tsv) }
+                .map { sample_a, sample_b, modification, venn_label, coverage_mode, annotated_tsv, meme_fasta -> tuple(coverage_mode, annotated_tsv) }
                 .groupTuple(by: 0)
 
             rank_dmr_genes(gene_rank_input_ch)
         }
 
-        // combine every pairwise comparison's filtered sites (per modification base and
+        // combine every pairwise comparison's filtered sites (per modification and
         // coverage mode) into one long table plus a reproducibility/overlap check
         combine_input_ch = dmr_filtered_ch
-            .map { sample_a, sample_b, base, venn_label, coverage_mode, raw_bed, filtered_tsv -> tuple(base, coverage_mode, venn_label, filtered_tsv) }
+            .map { sample_a, sample_b, modification, venn_label, coverage_mode, raw_bed, filtered_tsv -> tuple(modification, coverage_mode, venn_label, filtered_tsv) }
             .groupTuple(by: [0, 1])
 
         combine_dmr_results(combine_input_ch)
