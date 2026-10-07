@@ -93,21 +93,33 @@ workflow DMR_FLOW {
 
         volcano_plot(dmr_filtered_ch)
 
+        // combine_dmr_results needs gene names in its overlap summary (so "sites shared
+        // between samples" can show *which* genes they're in, not just coordinates) --
+        // feed it the gene-annotated table when one exists, the bare filtered one otherwise
+        def combine_source_ch
+
         if (!params.gff3) {
             println "\033[0;33mNote: --gff3 not provided -- DMR sites will not be annotated with gene names, de novo motif discovery and gene ranking (which both need that step's output) will be skipped.\033[0m"
+            combine_source_ch = dmr_filtered_ch
+                .map { sample_a, sample_b, modification, venn_label, coverage_mode, raw_bed, filtered_tsv -> tuple(modification, coverage_mode, venn_label, filtered_tsv) }
         } else {
             gff3_ch = Channel.value(file(params.gff3, checkIfExists: true))
             annotated_ch = annotate_dmr(dmr_filtered_ch.combine(fasta_ch).combine(gff3_ch)).annotated
 
-            // de novo motif discovery only makes sense on the "valid" (more sensitive) site
-            // set -- it's an exploratory step looking for candidate motifs, not a confirmatory
-            // one, and running it twice on largely-overlapping/subset data wastes a genuinely
-            // slow step for no extra information.
-            motif_input_ch = annotated_ch
-                .filter { sample_a, sample_b, modification, venn_label, coverage_mode, annotated_tsv, meme_fasta -> coverage_mode == "valid" }
-                .map { sample_a, sample_b, modification, venn_label, coverage_mode, annotated_tsv, meme_fasta -> tuple(sample_a, sample_b, modification, meme_fasta) }
+            // de novo motif discovery (streme) is off by default -- it's an exploratory,
+            // slow step, and streme has repeatedly been found to distort/truncate the real
+            // motif (it has to blindly infer both width and alignment, with no notion that
+            // these sequences are already centered on the known real modified base) --
+            // see TODO_dmr_reimplementation.md. Only makes sense on the "valid" (more
+            // sensitive) site set when enabled; running it on "strict" too would just waste
+            // a slow step on largely-overlapping data for no extra information.
+            if (params.dmr_discover_motifs) {
+                motif_input_ch = annotated_ch
+                    .filter { sample_a, sample_b, modification, venn_label, coverage_mode, annotated_tsv, meme_fasta -> coverage_mode == "valid" }
+                    .map { sample_a, sample_b, modification, venn_label, coverage_mode, annotated_tsv, meme_fasta -> tuple(sample_a, sample_b, modification, meme_fasta) }
 
-            discover_motifs(motif_input_ch)
+                discover_motifs(motif_input_ch)
+            }
 
             // gene ranking runs per coverage mode, so you can compare the "strict" ranking
             // against the full "valid" one the same way we did by hand earlier.
@@ -116,12 +128,14 @@ workflow DMR_FLOW {
                 .groupTuple(by: 0)
 
             rank_dmr_genes(gene_rank_input_ch)
+
+            combine_source_ch = annotated_ch
+                .map { sample_a, sample_b, modification, venn_label, coverage_mode, annotated_tsv, meme_fasta -> tuple(modification, coverage_mode, venn_label, annotated_tsv) }
         }
 
-        // combine every pairwise comparison's filtered sites (per modification and
-        // coverage mode) into one long table plus a reproducibility/overlap check
-        combine_input_ch = dmr_filtered_ch
-            .map { sample_a, sample_b, modification, venn_label, coverage_mode, raw_bed, filtered_tsv -> tuple(modification, coverage_mode, venn_label, filtered_tsv) }
+        // combine every pairwise comparison's sites (per modification and coverage mode)
+        // into one long table plus a reproducibility/overlap check
+        combine_input_ch = combine_source_ch
             .groupTuple(by: [0, 1])
 
         combine_dmr_results(combine_input_ch)
