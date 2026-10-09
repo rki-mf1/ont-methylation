@@ -287,53 +287,41 @@ process rank_dmr_genes {
 }
 
 process discover_motifs {
-    label 'meme'
-    // de novo motif discovery (streme, from the MEME Suite) on the sequence context around
-    // this comparison's DMR sites, one run per comparison -- kept separate rather than pooled
-    // across comparisons, since different comparisons can be driven by different underlying
-    // motifs/mechanisms and mixing them together risks washing out or confusing both signals.
-    // (Mapping a *known* motif's genome-wide positions is a separate, main-flow concern --
-    // see bin/map_motif.py -- this step is specifically about finding new candidate motifs
-    // from the DMR sites themselves, which only exist in this flow.)
+    label 'biopython'
+    // center-aware motif detection (bin/detect_motifs.py) on the sequence context around
+    // this comparison's DMR sites, one run per comparison -- kept separate rather than
+    // pooled across comparisons, since different comparisons can be driven by different
+    // underlying motifs/mechanisms and mixing them together risks washing out or confusing
+    // both signals. (Mapping a *known* motif's genome-wide positions is a separate,
+    // main-flow concern -- see bin/map_motif.py -- this step is specifically about finding
+    // new candidate motifs from the DMR sites themselves, which only exist in this flow.)
     //
-    // --objfun cd (Central Distance) instead of streme's default (Differential Enrichment):
-    // annotate_dmr.py's get_sequence_context() always puts the actual DMR base at the exact
-    // center of every sequence, so we reward motifs that consistently occur there rather than
-    // just "over-represented anywhere in the window vs. a shuffled background".
-    //
-    // streme's own report (HTML/XML/txt) is noisy to read directly, so the clean
-    // summarize_streme_motifs.py table is the main result -- the full streme run output is
-    // still published too, just kept out of the way in its own "streme_raw" subfolder so it
-    // doesn't clutter the clean per-comparison motif tables.
-    // emptiness checked in bash, see filter_dmr; streme_raw is always published regardless
-    // (it's the full streme report, kept out of the way for anyone who wants to dig in)
+    // Replaces streme (MEME Suite, dropped entirely -- see TODO_dmr_reimplementation.md).
+    // Every training sequence here is already centered on the real modified base, but
+    // streme has no notion of that and has to blindly infer both a motif's width and its
+    // alignment from scratch -- which repeatedly produced distorted, truncated motifs (e.g.
+    // CTGGCTGC instead of the real CCWGG, missing the base that makes it recognizable).
+    // detect_motifs.py only ever searches windows anchored at the known center -- see its
+    // own module docstring for the full algorithm. Pure stdlib, no MEME Suite dependency.
     publishDir { "${params.outdir}/dmr_analysis/motifs" }, mode: 'copy', pattern: "${sample_a}_vs_${sample_b}_${modification}_motifs.tsv"
-    publishDir { "${params.outdir}/dmr_analysis/motifs/streme_raw" }, mode: 'copy', pattern: "streme_${sample_a}_${sample_b}_${modification}"
 
     input:
     tuple val(sample_a), val(sample_b), val(modification), path(meme_fasta)
 
     output:
-    tuple val(sample_a), val(sample_b), val(modification),
-          path("streme_${sample_a}_${sample_b}_${modification}")
     path("${sample_a}_vs_${sample_b}_${modification}_motifs.tsv"), optional: true
 
     script:
     """
     n_sites=\$(grep -c "^>" ${meme_fasta} || true)
     if [ "\$n_sites" -lt ${params.dmr_motif_min_sites} ]; then
-        mkdir -p streme_${sample_a}_${sample_b}_${modification}
-        echo "Skipped motif discovery for ${sample_a} vs ${sample_b} (${modification}): only \$n_sites DMR site sequence(s), need >= ${params.dmr_motif_min_sites} (--dmr_motif_min_sites)." > streme_${sample_a}_${sample_b}_${modification}/SKIPPED.txt
+        echo "Skipped motif discovery for ${sample_a} vs ${sample_b} (${modification}): only \$n_sites DMR site sequence(s), need >= ${params.dmr_motif_min_sites} (--dmr_motif_min_sites)."
     else
-        streme --p ${meme_fasta} \
-            --dna \
-            --objfun cd \
+        detect_motifs.py \
+            --fasta ${meme_fasta} \
+            --output ${sample_a}_vs_${sample_b}_${modification}_motifs.tsv \
             --minw ${params.dmr_motif_minw} \
-            --maxw ${params.dmr_motif_maxw} \
-            --oc streme_${sample_a}_${sample_b}_${modification}
-        summarize_streme_motifs.py \
-            --xml streme_${sample_a}_${sample_b}_${modification}/streme.xml \
-            --output ${sample_a}_vs_${sample_b}_${modification}_motifs.tsv
+            --maxw ${params.dmr_motif_maxw}
         n_lines=\$(wc -l < ${sample_a}_vs_${sample_b}_${modification}_motifs.tsv)
         if [ "\$n_lines" -le 1 ]; then
             rm -f ${sample_a}_vs_${sample_b}_${modification}_motifs.tsv
@@ -342,7 +330,6 @@ process discover_motifs {
     """
     stub:
     """
-    mkdir -p streme_${sample_a}_${sample_b}_${modification}
     touch ${sample_a}_vs_${sample_b}_${modification}_motifs.tsv
     """
 }
