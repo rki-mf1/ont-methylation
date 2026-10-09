@@ -20,7 +20,7 @@ def parse_args():
 def main():
     args = parse_args()
 
-    dfs = [pd.read_csv(path, sep="\t") for path in args.annotated]
+    dfs = [pd.read_csv(path, sep="\t", dtype={"gene_start": "Int64", "gene_end": "Int64"}) for path in args.annotated]
     combined = pd.concat(dfs, ignore_index=True)
 
     genic = combined[combined["region_type"] == "genic"].copy()

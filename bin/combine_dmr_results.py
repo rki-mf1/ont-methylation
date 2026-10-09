@@ -148,7 +148,7 @@ def main():
 
     tables = {}
     for label, path in zip(args.labels, args.tsvs):
-        df = pd.read_csv(path, sep="\t")
+        df = pd.read_csv(path, sep="\t", dtype={"gene_start": "Int64", "gene_end": "Int64"})
         df.insert(0, "comparison", label)
         tables[label] = df
 

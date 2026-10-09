@@ -58,8 +58,12 @@ def main():
 
     # Convert numeric columns
     for col in ["a_total", "b_total", "a_pct_modified", "b_pct_modified",
-                "p_value", "effect_size", "score"]:
+                "p_value", "effect_size", "score",
+                "cohen_h", "cohen_h_low", "cohen_h_high"]:
         df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    neg = df["cohen_h"] < 0
+    df.loc[neg, ["cohen_h_low", "cohen_h_high"]] = -df.loc[neg, ["cohen_h_high", "cohen_h_low"]].values
 
     mask = (
         (df["a_total"] >= args.min_coverage) &

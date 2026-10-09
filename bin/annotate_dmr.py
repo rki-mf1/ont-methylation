@@ -100,6 +100,7 @@ def main():
     out_columns = list(df.columns) + ["gene", "gene_start", "gene_end", "gene_strand",
                                        "region_type", "sequence_context"]
     out = pd.DataFrame(rows, columns=out_columns)
+    out[["gene_start", "gene_end"]] = out[["gene_start", "gene_end"]].astype("Int64")
     out.to_csv(args.output, sep="\t", index=False)
     print(f"Annotated table -> {args.output}  ({len(out)} rows)")
 
