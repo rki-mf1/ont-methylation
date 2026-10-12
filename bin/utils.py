@@ -102,3 +102,8 @@ def read_modkit(modkit_output, percent_modified_threshold, modification, min_cov
     d = d[(d.Percent_modified >= percent_modified_threshold) & (d.Modification == modification) & (d.Total_coverage >= min_coverage)].drop("End", axis=1)
 
     return d
+
+
+def select_contigs(reference_genome, chromosome_only=False):
+    ordered = sorted(reference_genome, key=lambda k: len(reference_genome[k]), reverse=True)
+    return ordered[:1] if chromosome_only else ordered

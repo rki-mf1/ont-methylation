@@ -12,7 +12,7 @@ from Bio import SeqIO
 from Bio.Seq import Seq
 from Bio.SeqUtils import nt_search
 from scipy.signal import find_peaks
-from utils import parse_gff3_gene_names
+from utils import parse_gff3_gene_names, select_contigs
 
 
 def parse_args():
@@ -28,6 +28,7 @@ def parse_args():
     p.add_argument("--smoothing_window",     type=int,   default=100)
     p.add_argument("--enrichment_threshold", type=float, default=3.0)
     p.add_argument("--min_absolute_count",   type=int,   default=2)
+    p.add_argument("--chromosome_only",      action="store_true", help="Only analyse the largest contig")
     return p.parse_args()
 
 
@@ -47,7 +48,12 @@ def deduplicate_motifs(motif_df):
 
 
 def find_motif_positions(motif, genome_seq):
-    return np.array(nt_search(str(genome_seq), motif)[1:])
+    seq = str(genome_seq)
+    positions = nt_search(seq, motif)[1:]
+    rc = str(Seq(motif).reverse_complement())
+    if rc.upper() != motif.upper():
+        positions += nt_search(seq, rc)[1:]
+    return np.array(sorted(set(positions)))
 
 
 def compute_genome_density(mod_positions, genome_length, window_size, step_size):
@@ -72,25 +78,20 @@ def annotate_peaks(peak_positions, peak_heights, peak_counts, annotation):
             rows.append(dict(Peak_Position=int(pos), Density=round(float(height), 6),
                              Count=int(count), Gene="intergenic", Gene_Start=None,
                              Gene_End=None, Strand=None))
+    if not rows:
+        return pd.DataFrame(columns=["Peak_Position", "Density", "Count", "Gene", "Gene_Start", "Gene_End", "Strand"])
     return pd.DataFrame(rows).sort_values("Density", ascending=False)
 
 
-def process_motif(motif, label, genome_seq, genome_length, annotation, args):
-    print(f"\n--- {label} ---")
-    positions = find_motif_positions(motif, genome_seq)
-    print(f"  Occurrences: {len(positions)}")
-    if len(positions) < 50:
-        print("  Skipping — too few occurrences.")
-        return None
-
+def process_contig(positions, contig_length, annotation, args):
     genome_pos, raw_counts = compute_genome_density(
-        positions, genome_length, args.window_size, args.step_size)
+        positions, contig_length, args.window_size, args.step_size)
     density = raw_counts / args.window_size
     density_smooth = (pd.Series(density)
                       .rolling(window=args.smoothing_window, center=True)
                       .mean().bfill().ffill().values)
 
-    expected          = (len(positions) / genome_length) * args.window_size
+    expected          = (len(positions) / contig_length) * args.window_size
     enrichment_based  = (expected * args.enrichment_threshold) / args.window_size
     absolute_floor    = args.min_absolute_count / args.window_size
     min_peak_height   = max(enrichment_based, absolute_floor)
@@ -98,26 +99,38 @@ def process_motif(motif, label, genome_seq, genome_length, annotation, args):
     print(f"  Expected/window: {expected:.2f}  |  threshold: {min_peak_height:.5f}")
 
     peaks_idx, _ = find_peaks(density, height=min_peak_height, distance=min_peak_distance)
-    peak_positions = genome_pos[peaks_idx]
-    peak_heights   = density[peaks_idx]
-    peak_counts    = raw_counts[peaks_idx]
     print(f"  Peaks found: {len(peaks_idx)}")
+    peaks_df = annotate_peaks(genome_pos[peaks_idx], density[peaks_idx], raw_counts[peaks_idx], annotation)
+    density_df = pd.DataFrame({"Position": genome_pos, "Density_raw": density, "Density_smooth": density_smooth})
+    return density_df, peaks_df
 
-    peaks_df = annotate_peaks(peak_positions, peak_heights, peak_counts, annotation)
 
-    return genome_pos, density, density_smooth, peaks_df, peak_positions, peak_heights
+def process_motif(motif, contigs, reference_genome, annotation, args):
+    densities, peaks = [], []
+    for contig in contigs:
+        positions = find_motif_positions(motif, reference_genome[contig])
+        print(f"\n--- {motif} / {contig} ---  occurrences: {len(positions)}")
+        if len(positions) < 50:
+            print("  Skipping — too few occurrences.")
+            continue
+        contig_genes = [g for g in annotation if g[0] == contig]
+        density_df, peaks_df = process_contig(positions, len(reference_genome[contig]), contig_genes, args)
+        density_df.insert(0, "Contig", contig)
+        peaks_df.insert(0, "Contig", contig)
+        densities.append(density_df)
+        peaks.append(peaks_df)
+
+    if not densities:
+        return None
+    return pd.concat(densities, ignore_index=True), pd.concat(peaks, ignore_index=True)
 
 
 def save_results(results, outdir):
     os.makedirs(outdir, exist_ok=True)
-    for label, (genome_pos, density, density_smooth, peaks_df, _, _) in results.items():
+    for label, (density_df, peaks_df) in results.items():
         safe = label.replace(":", "_")
-        pd.DataFrame({"Position": genome_pos,
-                      "Density_raw": density,
-                      "Density_smooth": density_smooth}) \
-            .to_csv(os.path.join(outdir, f"density_{safe}.csv"), index=False)
-        peaks_df.to_csv(
-            os.path.join(outdir, f"peaks_{safe}.csv"), index=False)
+        density_df.to_csv(os.path.join(outdir, f"density_{safe}.csv"), index=False)
+        peaks_df.to_csv(os.path.join(outdir, f"peaks_{safe}.csv"), index=False)
         print(f"  Saved {label}")
 
 
@@ -126,11 +139,8 @@ def main():
 
     annotation = parse_gff3_gene_names(args.gff3)
     reference_genome = {r.id: r.seq for r in SeqIO.parse(args.fasta, "fasta")}
-    largest_contig = max(reference_genome, key=lambda k: len(reference_genome[k]))
-    genome_length  = len(reference_genome[largest_contig])
-    genome_seq     = reference_genome[largest_contig]
-    print(f"Contig: {largest_contig}  length: {genome_length}")
-    annotation = [g for g in annotation if g[0] == largest_contig]
+    contigs = select_contigs(reference_genome, args.chromosome_only)
+    print(f"Contigs: {', '.join(contigs)}")
 
     motif_df = pd.read_csv(args.motif_file, sep=r'\s+')
     motif_df.columns = motif_df.columns.str.strip()
@@ -140,11 +150,9 @@ def main():
 
     results = {}
     for _, row in motif_df_dedup.iterrows():
-        motif    = row["motif"]
-        label    = motif
-        result   = process_motif(motif, label, genome_seq, genome_length, annotation, args)
+        result = process_motif(row["motif"], contigs, reference_genome, annotation, args)
         if result is not None:
-            results[label] = result
+            results[row["motif"]] = result
 
     if not results:
         print("No results produced — exiting.")

@@ -18,7 +18,7 @@ def parse_args():
     return p.parse_args()
 
 
-INDEX_COLS = ["Gene", "Gene_Start", "Gene_End", "Strand"]
+INDEX_COLS = ["Contig", "Gene", "Gene_Start", "Gene_End", "Strand"]
 
 def load_peak_files(filepaths, source_type):
     dfs = []
@@ -34,8 +34,11 @@ def load_peak_files(filepaths, source_type):
         # row on pivot, losing all positional information. Fold Peak_Position into the
         # label so each intergenic peak stays distinct.
         is_intergenic = df["Gene"] == "intergenic"
+        if "Contig" not in df.columns:
+            df.insert(0, "Contig", "NA")
         df.loc[is_intergenic, "Gene"] = (
-            "intergenic_" + df.loc[is_intergenic, "Peak_Position"].astype(str)
+            "intergenic_" + df.loc[is_intergenic, "Contig"].astype(str) + "_"
+            + df.loc[is_intergenic, "Peak_Position"].astype(str)
         )
         dfs.append(df)
         print(f"  Loaded {len(df)} rows from {os.path.basename(filepath)}")
