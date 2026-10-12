@@ -26,6 +26,14 @@ def main():
     genic = combined[combined["region_type"] == "genic"].copy()
     genic["site_id"] = genic["chrom"].astype(str) + ":" + genic["start"].astype(str)
 
+    if genic.empty:
+        pd.DataFrame(columns=["gene", "chrom", "gene_start", "gene_end", "n_dmr_loci", "n_hits",
+                              "mean_abs_effect", "max_abs_score"]).to_csv(args.output, sep="\t", index=False)
+        pd.DataFrame(columns=["gene", "n_distinct_loci_with_this_name", "n_dmr_loci_total",
+                              "n_hits_total"]).to_csv(args.output.replace(".tsv", "_by_name.tsv"), sep="\t", index=False)
+        print("No genic DMR sites, wrote empty rankings")
+        return
+
     # Bakta (and most annotators) reuse generic names like "Phage tail protein" for many
     # distinct genes scattered across the genome -- group by the actual locus (name +
     # coordinates), not by name alone, or unrelated genes that share a name get merged

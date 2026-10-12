@@ -334,3 +334,43 @@ process discover_motifs {
     """
 }
 
+
+process dmr_qc_check {
+    label 'minimap2'
+    publishDir { "${params.outdir}/dmr_analysis/dmr_sites/tables/${coverage_mode}/qc_checked" }, mode: 'copy', pattern: "${sample_a}_vs_${sample_b}_${modification}_${coverage_mode}_*.tsv"
+
+    input:
+    tuple val(sample_a), val(sample_b), val(modification), val(coverage_mode), path(sites_tsv),
+          path(bam_a, stageAs: "a.bam"), path(bai_a, stageAs: "a.bam.bai"),
+          path(bam_b, stageAs: "b.bam"), path(bai_b, stageAs: "b.bam.bai"), path(reference)
+
+    output:
+    path("${sample_a}_vs_${sample_b}_${modification}_${coverage_mode}_qc.tsv"), optional: true
+    path("${sample_a}_vs_${sample_b}_${modification}_${coverage_mode}_dmr.tsv"), optional: true
+    path("qc_summary.tsv"), emit: summary
+
+    script:
+    def prefix = "${sample_a}_vs_${sample_b}_${modification}_${coverage_mode}"
+    """
+    dmr_hotspot_check.py \
+        --dmr ${sites_tsv} \
+        --bam-a a.bam \
+        --bam-b b.bam \
+        --fasta ${reference} \
+        --label ${prefix} \
+        --out-checked qc.tsv \
+        --out-pass dmr.tsv \
+        --out-summary qc_summary.tsv \
+        --window ${params.dmr_qc_window} \
+        --variant-window ${params.dmr_qc_variant_window} \
+        --variant-frac ${params.dmr_qc_variant_frac} \
+        --max-error ${params.dmr_qc_max_error} \
+        --max-error-diff ${params.dmr_qc_max_error_diff}
+    if [ \$(wc -l < qc.tsv) -gt 1 ]; then cp qc.tsv ${prefix}_qc.tsv; fi
+    if [ \$(wc -l < dmr.tsv) -gt 1 ]; then cp dmr.tsv ${prefix}_dmr.tsv; fi
+    """
+    stub:
+    """
+    touch qc_summary.tsv
+    """
+}

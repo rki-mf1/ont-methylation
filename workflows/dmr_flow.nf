@@ -2,7 +2,7 @@ include { bam2fastq; zipfastq; minimap2 } from '../modules/map_index_bam.nf'
 include { modkit_pileup; compress_index_modkit_bed } from '../modules/modkit.nf'
 include { verify_same_reference; reclassify_coverage; compress_index_reclassified;
           dmr_pair; filter_dmr; volcano_plot; annotate_dmr; combine_dmr_results;
-          discover_motifs; rank_dmr_genes } from '../modules/dmr.nf'
+          discover_motifs; rank_dmr_genes; dmr_qc_check } from '../modules/dmr.nf'
 
 // builds the all-vs-one pairing (every non-reference sample vs the reference) for one
 // coverage mode's set of samples. "venn_label" is just the non-reference sample's own id --
@@ -47,6 +47,7 @@ workflow DMR_FLOW {
             pileup_ch = modkit_pileup(mapped_bams)
             bed_gz_ch = compress_index_modkit_bed(pileup_ch)
                 .map { reference_name, sample_id, bed_gz, bed_gz_tbi -> tuple(sample_id, bed_gz, bed_gz_tbi) }
+            qc_bam_ch = mapped_bams.map { sample_id, bam, bai, reference -> tuple(sample_id, bam, bai) }
         } else {
             bed_with_tbi_ch = sample_input_ch.map { sample_id, bed_gz ->
                 def tbi = file("${bed_gz}.tbi")
@@ -58,15 +59,29 @@ workflow DMR_FLOW {
             // already-compressed input skips mapping entirely, so we can't be sure every
             // sample was actually pileup'd against the same reference -- check contig names.
             bed_gz_ch = verify_same_reference(bed_with_tbi_ch.combine(fasta_ch))
+
+            if (params.dmr_bam_list) {
+                qc_bam_ch = Channel.fromPath(params.dmr_bam_list, checkIfExists: true)
+                    .splitCsv()
+                    .map { row ->
+                        def bam = file(row[1], checkIfExists: true)
+                        def bai = file("${row[1]}.bai")
+                        if (!bai.exists()) {
+                            error "❌ Missing index for ${bam} (expected ${bam}.bai). Run samtools index first."
+                        }
+                        tuple(row[0], bam, bai)
+                    }
+            } else {
+                println "\033[0;33mNote: --dmr_bam_list not provided -- DMR sites will not be checked for variants and basecalling-error hotspots.\033[0m"
+                qc_bam_ch = Channel.empty()
+            }
         }
 
         // "valid" coverage mode = modkit's own native behavior (confidently-classified
         // reads only). "strict" = reclassify ambiguous reads as unmodified first, so modkit's
         // statistics get computed against total coverage instead -- a stricter subset of the
-        // valid-mode hits, see TODO_dmr_reimplementation.md. Both run side by side; only
-        // "valid" feeds de novo motif discovery (see below).
-        bed_gz_strict_ch = compress_index_reclassified(reclassify_coverage(bed_gz_ch))
-
+        // valid-mode hits, see TODO_dmr_reimplementation.md. Strict only runs with --dmr_strict;
+        // only "valid" feeds de novo motif discovery (see below).
         modifications_ch = Channel.fromList(params.dmr_modifications.split(",").collect { it.trim() })
 
         // DSL2 forbids calling the same process twice in one workflow scope, so rather than
@@ -75,7 +90,12 @@ workflow DMR_FLOW {
         // just rides along as a value in the tuple and fans back out into separate
         // publishDir/filenames naturally (see modules/dmr.nf).
         bed_gz_tagged_ch = bed_gz_ch.map { sample_id, bed_gz, tbi -> tuple("valid", sample_id, bed_gz, tbi) }
-            .mix(bed_gz_strict_ch.map { sample_id, bed_gz, tbi -> tuple("strict", sample_id, bed_gz, tbi) })
+
+        if (params.dmr_strict) {
+            bed_gz_strict_ch = compress_index_reclassified(reclassify_coverage(bed_gz_ch))
+            bed_gz_tagged_ch = bed_gz_tagged_ch
+                .mix(bed_gz_strict_ch.map { sample_id, bed_gz, tbi -> tuple("strict", sample_id, bed_gz, tbi) })
+        }
 
         pairs_ch = bed_gz_tagged_ch
             .map { mode, sample_id, bed_gz, tbi -> tuple(mode, [sample_id, bed_gz, tbi]) }
@@ -102,6 +122,8 @@ workflow DMR_FLOW {
             println "\033[0;33mNote: --gff3 not provided -- DMR sites will not be annotated with gene names, de novo motif discovery and gene ranking (which both need that step's output) will be skipped.\033[0m"
             combine_source_ch = dmr_filtered_ch
                 .map { sample_a, sample_b, modification, venn_label, coverage_mode, raw_bed, filtered_tsv -> tuple(modification, coverage_mode, venn_label, filtered_tsv) }
+            qc_source_ch = dmr_filtered_ch
+                .map { sample_a, sample_b, modification, venn_label, coverage_mode, raw_bed, filtered_tsv -> tuple(sample_a, sample_b, modification, coverage_mode, filtered_tsv) }
         } else {
             gff3_ch = Channel.value(file(params.gff3, checkIfExists: true))
             annotated_ch = annotate_dmr(dmr_filtered_ch.combine(fasta_ch).combine(gff3_ch)).annotated
@@ -131,6 +153,8 @@ workflow DMR_FLOW {
 
             combine_source_ch = annotated_ch
                 .map { sample_a, sample_b, modification, venn_label, coverage_mode, annotated_tsv, meme_fasta -> tuple(modification, coverage_mode, venn_label, annotated_tsv) }
+            qc_source_ch = annotated_ch
+                .map { sample_a, sample_b, modification, venn_label, coverage_mode, annotated_tsv, meme_fasta -> tuple(sample_a, sample_b, modification, coverage_mode, annotated_tsv) }
         }
 
         // combine every pairwise comparison's sites (per modification and coverage mode)
@@ -139,4 +163,15 @@ workflow DMR_FLOW {
             .groupTuple(by: [0, 1])
 
         combine_dmr_results(combine_input_ch)
+
+        qc_input_ch = qc_source_ch
+            .combine(qc_bam_ch, by: 0)
+            .map { sample_a, sample_b, modification, coverage_mode, sites_tsv, bam_a, bai_a -> tuple(sample_b, sample_a, modification, coverage_mode, sites_tsv, bam_a, bai_a) }
+            .combine(qc_bam_ch, by: 0)
+            .map { sample_b, sample_a, modification, coverage_mode, sites_tsv, bam_a, bai_a, bam_b, bai_b -> tuple(sample_a, sample_b, modification, coverage_mode, sites_tsv, bam_a, bai_a, bam_b, bai_b) }
+            .combine(fasta_ch)
+
+        dmr_qc_check(qc_input_ch).summary
+            .collectFile(name: "dmr_qc_summary.tsv", keepHeader: true, skip: 1, sort: true,
+                         storeDir: "${params.outdir}/dmr_analysis/dmr_sites/tables")
 }
