@@ -337,7 +337,8 @@ process discover_motifs {
 
 process dmr_qc_check {
     label 'minimap2'
-    publishDir { "${params.outdir}/dmr_analysis/dmr_sites/tables/${coverage_mode}/qc_checked" }, mode: 'copy', pattern: "${sample_a}_vs_${sample_b}_${modification}_${coverage_mode}_*.tsv"
+    publishDir { "${params.outdir}/dmr_analysis/dmr_sites/tables/${coverage_mode}/qc_checked" }, mode: 'copy', pattern: "${sample_a}_vs_${sample_b}_${modification}_${coverage_mode}_qc.tsv"
+    publishDir { "${params.outdir}/dmr_analysis/dmr_sites_qc_passed/${coverage_mode}" }, mode: 'copy', pattern: "${sample_a}_vs_${sample_b}_${modification}_${coverage_mode}_dmr.tsv"
 
     input:
     tuple val(sample_a), val(sample_b), val(modification), val(coverage_mode), path(sites_tsv),
