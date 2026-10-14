@@ -1,7 +1,7 @@
 include { bam2fastq; zipfastq; minimap2; split_bam_by_bin } from '../modules/map_index_bam.nf'
 include { modkit_pileup; compress_index_modkit_bed; modkit_pileup_bigwigs; modkit_find_motifs; compute_methylation_tracks; methylation_tracks_to_bigwig; publish_results_meta; publish_results_motifs_meta; publish_results; publish_results_motifs} from '../modules/modkit.nf'
 include { compute_statistics } from '../modules/statistics.nf'
-include { capture_minimap2_samtools_version; capture_modkit_version; write_versions_summary } from '../modules/versions.nf'
+include { capture_minimap2_samtools_version; capture_modkit_version; capture_basecalling_info; write_versions_summary } from '../modules/versions.nf'
 
 workflow MAIN_FLOW {
     take:
@@ -58,7 +58,7 @@ workflow MAIN_FLOW {
             publish_results_motifs(publish_motifs_input)
         }
 
-        write_versions_summary(capture_minimap2_samtools_version(), capture_modkit_version())
+        write_versions_summary(capture_minimap2_samtools_version(), capture_modkit_version(), capture_basecalling_info(bam_input_ch).collect())
 
     emit:
         bed_file
